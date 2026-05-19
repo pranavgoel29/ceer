@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
+import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { filterSourcesByKind } from "~/hooks/use-desktop-sources";
+import { loadingQuips, pickQuip } from "~/lib/quips";
 import { cn } from "~/lib/utils";
 
 interface SourcePickerProps {
@@ -23,7 +24,7 @@ interface SourcePickerProps {
 }
 
 const tabMeta: { value: CaptureSourceKind | "all"; label: string }[] = [
-  { value: "all", label: "Everything" },
+  { value: "all", label: "All" },
   { value: "screen", label: "Screens" },
   { value: "window", label: "Windows" },
 ];
@@ -43,57 +44,56 @@ export function SourcePicker({
   const [tab, setTab] = useState<CaptureSourceKind | "all">("all");
 
   return (
-    <Card className="rotate-[0.4deg] border-border/70 bg-card/80 backdrop-blur-sm">
-      <CardContent className="flex flex-col gap-4 pt-5">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="font-heading text-sm tracking-widest text-ceer-lime uppercase">Pick your prey</h2>
-            <p className="text-xs text-muted-foreground">Screens, apps, chaos.</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onRefresh()}
-            disabled={loading || disabled}
-            aria-label="Refresh sources"
-          >
-            <ArrowsClockwiseIcon className={cn(loading && "animate-spin")} />
-          </Button>
-        </div>
-
-        <Tabs value={tab} onValueChange={(value) => setTab(value as CaptureSourceKind | "all")}>
-          <TabsList className="w-full">
-            {tabMeta.map((item) => (
-              <TabsTrigger key={item.value} value={item.value} className="flex-1 text-xs">
-                {item.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+    <RecorderPanel
+      eyebrow="Sources"
+      title="Pick your prey"
+      description="Screens, apps, or a cropped region."
+      accent="lime"
+      tilt="right"
+      action={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => onRefresh()}
+          disabled={loading || disabled}
+          aria-label="Refresh sources"
+        >
+          <ArrowsClockwiseIcon className={cn(loading && "animate-spin")} />
+        </Button>
+      }
+    >
+      <Tabs value={tab} onValueChange={(value) => setTab(value as CaptureSourceKind | "all")}>
+        <TabsList className="grid h-9 w-full grid-cols-3">
           {tabMeta.map((item) => (
-            <TabsContent key={item.value} value={item.value} className="mt-3">
-              <SourceGrid
-                sources={filterSourcesByKind(sources, item.value)}
-                selectedId={selectedId}
-                disabled={disabled}
-                loading={loading}
-                onSelect={onSelect}
-              />
-            </TabsContent>
+            <TabsTrigger key={item.value} value={item.value} className="text-xs">
+              {item.label}
+            </TabsTrigger>
           ))}
-        </Tabs>
+        </TabsList>
+        {tabMeta.map((item) => (
+          <TabsContent key={item.value} value={item.value} className="mt-3">
+            <SourceGrid
+              sources={filterSourcesByKind(sources, item.value)}
+              selectedId={selectedId}
+              disabled={disabled}
+              loading={loading}
+              onSelect={onSelect}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <AreaPickSection
-          sources={sources}
-          selectedId={selectedId}
-          areaSourceId={areaSourceId}
-          pickingArea={pickingArea}
-          disabled={disabled}
-          onPickArea={onPickArea}
-        />
-      </CardContent>
-    </Card>
+      <AreaPickSection
+        sources={sources}
+        selectedId={selectedId}
+        areaSourceId={areaSourceId}
+        pickingArea={pickingArea}
+        disabled={disabled}
+        onPickArea={onPickArea}
+      />
+    </RecorderPanel>
   );
 }
 
@@ -125,15 +125,17 @@ function AreaPickSection({
   const canPick = Boolean(targetId) && !disabled && !pickingArea;
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-ceer-lime/30 bg-ceer-lime/5 p-3">
-      <div className="flex items-start gap-2">
-        <SquareIcon className="mt-0.5 size-4 shrink-0 text-ceer-lime" weight="duotone" />
+    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-ceer-lime/35 bg-ceer-lime/5 p-3.5">
+      <div className="flex items-start gap-2.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-ceer-lime/15 text-ceer-lime">
+          <SquareIcon className="size-4" weight="duotone" />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">Snip a region</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {screenSources.length === 0
-              ? "Pick a display under Screens first."
-              : "Drag a rectangle on the display, then we crop the capture."}
+              ? "Choose a display under Screens first."
+              : "Draw a rectangle on the display; we crop the capture to match."}
           </p>
         </div>
       </div>
@@ -141,7 +143,7 @@ function AreaPickSection({
         type="button"
         variant="outline"
         size="sm"
-        className="w-full"
+        className="w-full border-ceer-lime/30"
         disabled={!canPick}
         onClick={() => targetId && onPickArea(targetId)}
       >
@@ -153,15 +155,19 @@ function AreaPickSection({
 
 function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: SourceGridProps) {
   if (loading && sources.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Summoning windows…</p>;
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">{pickQuip(loadingQuips)}</p>
+    );
   }
 
   if (sources.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Nothing here. Try another tab?</p>;
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">Nothing here. Try another tab?</p>
+    );
   }
 
   return (
-    <ul className="grid max-h-[340px] grid-cols-2 gap-3 overflow-y-auto pr-1">
+    <ul className="grid max-h-[min(42vh,380px)] grid-cols-1 gap-2.5 overflow-y-auto pr-0.5 sm:grid-cols-2">
       {sources.map((source, index) => {
         const selected = source.id === selectedId;
         const tilt =
@@ -178,14 +184,14 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
               disabled={disabled}
               onClick={() => onSelect(source.id)}
               className={cn(
-                "group box-border flex w-full flex-col rounded-2xl border-2 p-0 text-left transition-colors",
+                "group box-border flex w-full flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
                 selected
-                  ? "border-ceer-lime bg-ceer-lime/10"
-                  : "border-border/80 bg-muted/20 hover:border-ceer-coral/50 hover:bg-muted/40",
+                  ? "border-ceer-lime bg-ceer-lime/10 shadow-[0_0_0_1px] shadow-ceer-lime/20"
+                  : "border-border/70 bg-muted/15 hover:border-ceer-coral/40 hover:bg-muted/35",
                 disabled && "pointer-events-none opacity-50",
               )}
             >
-              <div className="relative aspect-video w-full shrink-0 bg-black/40 p-2">
+              <div className="relative aspect-video w-full shrink-0 bg-black/50 p-1.5">
                 <div
                   className={cn(
                     "relative size-full overflow-hidden rounded-lg bg-black/60 transition-transform duration-200",
@@ -199,19 +205,26 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
                       className="size-full object-cover opacity-90 transition group-hover:opacity-100"
                     />
                   ) : (
-                    <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
+                    <div className="flex size-full items-center justify-center text-[10px] text-muted-foreground">
                       No preview
                     </div>
                   )}
                 </div>
                 <Badge
-                  className="absolute top-2 left-2 z-10 text-[9px] uppercase"
+                  className="absolute top-2 left-2 z-10 gap-0.5 text-[9px] uppercase"
                   variant={source.kind === "screen" ? "default" : "secondary"}
                 >
-                  {source.kind === "screen" ? <DesktopIcon className="size-3" /> : "app"}
+                  {source.kind === "screen" ? (
+                    <>
+                      <DesktopIcon className="size-3" />
+                      Screen
+                    </>
+                  ) : (
+                    "Window"
+                  )}
                 </Badge>
               </div>
-              <span className="truncate px-2 py-2 text-xs font-medium">{source.name}</span>
+              <span className="truncate px-2.5 py-2 text-xs font-medium">{source.name}</span>
             </button>
           </li>
         );

@@ -12,13 +12,15 @@ export function QuipBanner({ text, className, pulse }: QuipBannerProps) {
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-2xl border border-ceer-lime/20 bg-ceer-lime/8 px-4 py-3 text-sm leading-relaxed",
+        "flex items-center gap-3 rounded-2xl border border-ceer-lime/25 bg-gradient-to-r from-ceer-lime/10 via-card/60 to-card/40 px-4 py-3 text-sm leading-relaxed shadow-sm backdrop-blur-sm",
         pulse && "ceer-pulse-border",
         className,
       )}
     >
-      <SparkleIcon className="mt-0.5 size-4 shrink-0 text-ceer-lime" weight="fill" />
-      <p className="text-foreground/90">{text}</p>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-ceer-lime/15 text-ceer-lime">
+        <SparkleIcon className="size-4" weight="fill" />
+      </span>
+      <p className="min-w-0 flex-1 text-foreground/90">{text}</p>
     </div>
   );
 }

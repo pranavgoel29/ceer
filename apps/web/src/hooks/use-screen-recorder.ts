@@ -5,6 +5,7 @@ import type { CaptureRegion, CaptureRegionPickResult, DisplayBounds } from "@cee
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
 import { cropVideoStream } from "~/lib/crop-video-stream";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import { loadingQuips, pickQuip } from "~/lib/quips";
 
 export type RecorderPhase = "idle" | "armed" | "recording" | "stopped";
 
@@ -43,6 +44,8 @@ export function useScreenRecorder() {
   const [armedSourceId, setArmedSourceId] = useState<string | null>(null);
   const [captureRegion, setCaptureRegion] = useState<CaptureRegion | null>(null);
   const [captureDisplay, setCaptureDisplay] = useState<DisplayBounds | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoadingMessage, setPreviewLoadingMessage] = useState(() => pickQuip(loadingQuips));
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -109,6 +112,8 @@ export function useScreenRecorder() {
       previewStreamRef.current = null;
       setPreviewStream(null);
       setPhase("idle");
+      setPreviewLoadingMessage(pickQuip(loadingQuips));
+      setPreviewLoading(true);
 
       bridge.setCapturePreferences({ systemAudioEnabled });
       bridge.setCaptureSource(sourceId);
@@ -180,6 +185,8 @@ export function useScreenRecorder() {
         bridge.setCaptureSource(null);
         setArmedSourceId(null);
         setError(cause instanceof Error ? cause.message : "Could not start preview");
+      } finally {
+        setPreviewLoading(false);
       }
     },
     [bridge, micEnabled, releaseAudioResources, systemAudioEnabled],
@@ -267,6 +274,8 @@ export function useScreenRecorder() {
 
   return {
     phase,
+    previewLoading,
+    previewLoadingMessage,
     previewStream,
     recording,
     error,

@@ -1,4 +1,3 @@
-import type { DesktopAppInfo } from "@ceer/contracts";
 import { useEffect, useMemo, useState } from "react";
 
 import { BrowserGate } from "~/components/recorder/browser-gate";
@@ -12,11 +11,7 @@ import { useDesktopSources } from "~/hooks/use-desktop-sources";
 import { useScreenRecorder } from "~/hooks/use-screen-recorder";
 import { armedQuips, doneQuips, idleQuips, pickQuip, recordingQuips } from "~/lib/quips";
 
-interface RecorderAppProps {
-  readonly appInfo: DesktopAppInfo;
-}
-
-export function RecorderApp({ appInfo }: RecorderAppProps) {
+export function RecorderApp() {
   const bridge = useDesktopBridge();
   const { sources, loading, error, refresh } = useDesktopSources();
   const recorder = useScreenRecorder();
@@ -27,6 +22,10 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
   const [quip, setQuip] = useState<string>(() => pickQuip(idleQuips));
 
   useEffect(() => {
+    if (recorder.previewLoading) {
+      setQuip(recorder.previewLoadingMessage);
+      return;
+    }
     if (recorder.phase === "idle") {
       setQuip(pickQuip(idleQuips));
     } else if (recorder.phase === "armed") {
@@ -36,7 +35,7 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
     } else if (recorder.phase === "stopped") {
       setQuip(pickQuip(doneQuips));
     }
-  }, [recorder.phase]);
+  }, [recorder.phase, recorder.previewLoading, recorder.previewLoadingMessage]);
 
   const handleSelectSource = (sourceId: string) => {
     if (recorder.phase === "recording") {
@@ -103,54 +102,72 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
   );
 
   return (
-    <div className="ceer-grain relative min-h-svh overflow-hidden">
+    <div className="ceer-shell ceer-grain relative overflow-x-hidden">
       <div className="ceer-orb ceer-orb-a" aria-hidden />
       <div className="ceer-orb ceer-orb-b" aria-hidden />
 
-      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6 p-6 pb-10">
-        <RecorderHeader appInfo={appInfo} />
-        <QuipBanner text={quip} pulse={recorder.phase === "recording"} />
+      <div className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:gap-6">
+        <RecorderHeader phase={recorder.phase} />
 
-        {combinedError ? (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            {combinedError}
-          </p>
-        ) : null}
+        <div className="ceer-stagger flex flex-col gap-4 lg:gap-5">
+          <QuipBanner text={quip} pulse={recorder.phase === "recording"} />
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_1fr_minmax(0,280px)]">
-          <SourcePicker
-            sources={sources}
-            loading={loading}
-            error={error}
-            selectedId={selectedSourceId}
-            areaSourceId={areaSourceId}
-            pickingArea={pickingArea}
-            disabled={pickerDisabled}
-            onRefresh={() => void refresh()}
-            onSelect={handleSelectSource}
-            onPickArea={(sourceId) => void handlePickArea(sourceId)}
-          />
+          {combinedError ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
+            >
+              {combinedError}
+            </p>
+          ) : null}
 
-          <RecordStage
-            phase={recorder.phase}
-            previewStream={recorder.previewStream}
-            recordingUrl={recorder.recording?.url ?? null}
-            elapsedMs={recorder.elapsedMs}
-            captureRegion={recorder.captureRegion}
-          />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5 xl:gap-6">
+            <aside className="order-2 lg:order-1 lg:col-span-4 xl:col-span-3">
+              <div className="lg:sticky lg:top-5">
+                <SourcePicker
+                  sources={sources}
+                  loading={loading}
+                  error={error}
+                  selectedId={selectedSourceId}
+                  areaSourceId={areaSourceId}
+                  pickingArea={pickingArea}
+                  disabled={pickerDisabled}
+                  onRefresh={() => void refresh()}
+                  onSelect={handleSelectSource}
+                  onPickArea={(sourceId) => void handlePickArea(sourceId)}
+                />
+              </div>
+            </aside>
 
-          <RecordControls
-            phase={recorder.phase}
-            micEnabled={recorder.micEnabled}
-            systemAudioEnabled={recorder.systemAudioEnabled}
-            recording={recorder.recording}
-            canRecord={canRecord}
-            onMicChange={handleMicChange}
-            onSystemAudioChange={handleSystemAudioChange}
-            onStart={recorder.startRecording}
-            onStop={recorder.stopRecording}
-            onDiscard={handleDiscard}
-          />
+            <main className="order-1 min-w-0 lg:order-2 lg:col-span-5 xl:col-span-6">
+              <RecordStage
+                phase={recorder.phase}
+                previewLoading={recorder.previewLoading}
+                loadingMessage={recorder.previewLoadingMessage}
+                previewStream={recorder.previewStream}
+                recordingUrl={recorder.recording?.url ?? null}
+                elapsedMs={recorder.elapsedMs}
+                captureRegion={recorder.captureRegion}
+              />
+            </main>
+
+            <aside className="order-3 lg:col-span-3 xl:col-span-3">
+              <div className="lg:sticky lg:top-5">
+                <RecordControls
+                  phase={recorder.phase}
+                  micEnabled={recorder.micEnabled}
+                  systemAudioEnabled={recorder.systemAudioEnabled}
+                  recording={recorder.recording}
+                  canRecord={canRecord}
+                  onMicChange={handleMicChange}
+                  onSystemAudioChange={handleSystemAudioChange}
+                  onStart={recorder.startRecording}
+                  onStop={recorder.stopRecording}
+                  onDiscard={handleDiscard}
+                />
+              </div>
+            </aside>
+          </div>
         </div>
       </div>
     </div>
@@ -159,11 +176,9 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
 
 export function RecorderRoot() {
   const bridge = useDesktopBridge();
-  const appInfo = bridge?.getAppInfo() ?? null;
-
-  if (!bridge || !appInfo) {
+  if (!bridge) {
     return <BrowserGate />;
   }
 
-  return <RecorderApp appInfo={appInfo} />;
+  return <RecorderApp />;
 }
