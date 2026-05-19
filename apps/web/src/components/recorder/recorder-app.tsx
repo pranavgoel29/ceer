@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { BrowserGate } from "~/components/recorder/browser-gate";
-import { QuipBanner } from "~/components/recorder/quip-banner";
 import { RecordControls } from "~/components/recorder/record-controls";
 import { RecordStage } from "~/components/recorder/record-stage";
 import { RecorderHeader } from "~/components/recorder/recorder-header";
@@ -9,7 +8,6 @@ import { SourcePicker } from "~/components/recorder/source-picker";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { useDesktopSources } from "~/hooks/use-desktop-sources";
 import { useScreenRecorder } from "~/hooks/use-screen-recorder";
-import { armedQuips, doneQuips, idleQuips, pickQuip, recordingQuips } from "~/lib/quips";
 
 export function RecorderApp() {
   const bridge = useDesktopBridge();
@@ -19,23 +17,6 @@ export function RecorderApp() {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [areaSourceId, setAreaSourceId] = useState<string | null>(null);
   const [pickingArea, setPickingArea] = useState(false);
-  const [quip, setQuip] = useState<string>(() => pickQuip(idleQuips));
-
-  useEffect(() => {
-    if (recorder.previewLoading) {
-      setQuip(recorder.previewLoadingMessage);
-      return;
-    }
-    if (recorder.phase === "idle") {
-      setQuip(pickQuip(idleQuips));
-    } else if (recorder.phase === "armed") {
-      setQuip(pickQuip(armedQuips));
-    } else if (recorder.phase === "recording") {
-      setQuip(pickQuip(recordingQuips));
-    } else if (recorder.phase === "stopped") {
-      setQuip(pickQuip(doneQuips));
-    }
-  }, [recorder.phase, recorder.previewLoading, recorder.previewLoadingMessage]);
 
   const handleSelectSource = (sourceId: string) => {
     if (recorder.phase === "recording") {
@@ -110,8 +91,6 @@ export function RecorderApp() {
         <RecorderHeader phase={recorder.phase} />
 
         <div className="ceer-stagger flex flex-col gap-4 lg:gap-5">
-          <QuipBanner text={quip} pulse={recorder.phase === "recording"} />
-
           {combinedError ? (
             <p
               role="alert"
