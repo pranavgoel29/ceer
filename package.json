@@ -11,6 +11,8 @@
     "dev:web": "turbo run dev --filter=@ceer/web",
     "dev:desktop": "node scripts/dev.mjs desktop",
     "build": "turbo run build",
+    "dist:mac": "turbo run build && bun run --cwd apps/desktop dist:mac",
+    "dist:win": "turbo run build && bun run --cwd apps/desktop dist:win",
     "typecheck": "turbo run typecheck",
     "setup:electron": "node scripts/ensure-electron.mjs"
   },

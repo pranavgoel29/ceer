@@ -1,6 +1,6 @@
 {
   "name": "@ceer/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -9,15 +9,19 @@
     "dev:bundle": "tsdown --watch",
     "dev:electron": "node scripts/dev-electron.mjs",
     "build": "tsdown",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
     "start": "node scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ceer/contracts": "workspace:*",
-    "electron": "^35.1.2"
+    "@ceer/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "electron": "^35.1.2",
+    "electron-builder": "^25.1.8",
     "tsdown": "^0.12.0",
     "typescript": "^5.8.3"
   },

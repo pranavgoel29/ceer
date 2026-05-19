@@ -13,6 +13,9 @@ function resolvePreloadPath(): string {
 }
 
 function resolveProductionIndexHtml(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "web", "index.html");
+  }
   return path.join(__dirname, "../../web/dist/index.html");
 }
 

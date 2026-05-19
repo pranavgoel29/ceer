@@ -1,0 +1,37 @@
+appId: com.ceer.app
+productName: Ceer
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist-electron/**/*
+  - package.json
+  - "!**/*.map"
+
+extraResources:
+  - from: ../web/dist
+    to: web
+    filter:
+      - "**/*"
+
+asar: true
+
+mac:
+  category: public.app-category.video
+  target:
+    - dmg
+
+dmg:
+  title: Ceer
+
+win:
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true

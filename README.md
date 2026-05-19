@@ -11,7 +11,7 @@ Screen recorder monorepo:
 ## Prerequisites
 
 - [Bun](https://bun.sh) 1.2+
-- macOS or Windows (Linux dev works; packaging not set up yet)
+- macOS or Windows for distributable builds
 
 ## Develop
 
@@ -70,12 +70,28 @@ Then run the desktop app against the built web assets:
 cd apps/desktop && bun run start
 ```
 
+## Package installers
+
+Build web + desktop, then run [electron-builder](https://www.electron.build/) from `apps/desktop`:
+
+```bash
+# macOS → apps/desktop/release/*.dmg
+bun run dist:mac
+
+# Windows → apps/desktop/release/*.exe (NSIS installer)
+bun run dist:win
+```
+
+Config: `apps/desktop/electron-builder.yml`. Packaged UI lives under `process.resourcesPath/web/` (see `main.ts`).
+
+Add icons later under `apps/desktop/resources/` (`icon.icns`, `icon.ico`).
+
 ## Layout
 
 ```
 ceer/
 ├── apps/
-│   ├── desktop/          # Electron main + preload (tsdown → dist-electron/)
+│   ├── desktop/          # Electron main + preload + electron-builder.yml
 │   └── web/              # React renderer (Vite)
 ├── packages/
 │   └── contracts/        # DesktopBridge + IPC types
