@@ -1,0 +1,25 @@
+{
+  "name": "@ceer/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "bun run --parallel dev:bundle dev:electron",
+    "dev:bundle": "tsdown --watch",
+    "dev:electron": "node scripts/dev-electron.mjs",
+    "build": "tsdown",
+    "start": "node scripts/start-electron.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ceer/contracts": "workspace:*",
+    "electron": "^35.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsdown": "^0.12.0",
+    "typescript": "^5.8.3"
+  },
+  "productName": "Ceer"
+}

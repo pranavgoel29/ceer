@@ -1,0 +1,10 @@
+node_modules
+.turbo
+dist
+dist-electron
+.electron-runtime
+*.log
+.DS_Store
+
+# Local planning notes (not committed)
+notes/

@@ -1,0 +1,23 @@
+{
+  "name": "@ceer/monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": {
+    "packages": ["apps/*", "packages/*"]
+  },
+  "scripts": {
+    "postinstall": "node scripts/ensure-electron.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "turbo run dev --filter=@ceer/web",
+    "dev:desktop": "node scripts/dev.mjs desktop",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "setup:electron": "node scripts/ensure-electron.mjs"
+  },
+  "trustedDependencies": ["electron"],
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "bun@1.2.19"
+}
