@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CaptureRegion, CaptureRegionPickResult, DisplayBounds } from "@ceer/contracts";
+import type {
+  CaptureRegion,
+  CaptureRegionPickResult,
+  CaptureSourceRef,
+  DisplayBounds,
+} from "@ceer/contracts";
 
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
 import { cropVideoStream } from "~/lib/crop-video-stream";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import { PREVIEW_LOADING_MIN_MS, waitForMinDuration } from "~/lib/min-duration";
 import { loadingQuips, pickQuip } from "~/lib/quips";
 
 export type RecorderPhase = "idle" | "armed" | "recording" | "stopped";
@@ -56,6 +62,8 @@ export function useScreenRecorder() {
   const cropCleanupRef = useRef<(() => void) | null>(null);
   const micStreamsRef = useRef<MediaStream[]>([]);
   const regionPickRef = useRef<CaptureRegionPickResult | null>(null);
+  const armedSourceRef = useRef<CaptureSourceRef | null>(null);
+  const armGenerationRef = useRef(0);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -86,6 +94,7 @@ export function useScreenRecorder() {
     setCaptureRegion(null);
     setCaptureDisplay(null);
     regionPickRef.current = null;
+    armedSourceRef.current = null;
     startedAtRef.current = null;
     clearTimer();
   }, [clearTimer, releaseAudioResources]);
@@ -95,7 +104,7 @@ export function useScreenRecorder() {
   }, [bridge, systemAudioEnabled]);
 
   const armPreview = useCallback(
-    async (sourceId: string, regionPick?: CaptureRegionPickResult | null) => {
+    async (source: CaptureSourceRef, regionPick?: CaptureRegionPickResult | null) => {
       if (!bridge) {
         setError("Open Ceer in Electron to capture the desktop.");
         return;
@@ -106,6 +115,8 @@ export function useScreenRecorder() {
       }
 
       const activeRegionPick = regionPickRef.current;
+      const armGeneration = ++armGenerationRef.current;
+      const loadingStartedAt = Date.now();
       setError(null);
       releaseAudioResources();
       stopStream(previewStreamRef.current);
@@ -116,7 +127,7 @@ export function useScreenRecorder() {
       setPreviewLoading(true);
 
       bridge.setCapturePreferences({ systemAudioEnabled });
-      bridge.setCaptureSource(sourceId);
+      bridge.setCaptureSource(source);
 
       try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -179,17 +190,34 @@ export function useScreenRecorder() {
 
         previewStreamRef.current = outputStream;
         setPreviewStream(outputStream);
-        setArmedSourceId(sourceId);
+        setArmedSourceId(source.id);
+        armedSourceRef.current = source;
         setPhase("armed");
+
+        const videoTrack = outputStream.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.onended = () => {
+            if (armGenerationRef.current !== armGeneration) {
+              return;
+            }
+            setError("Capture was interrupted — select the source again.");
+            resetPreview();
+            bridge.setCaptureSource(null);
+          };
+        }
       } catch (cause) {
         bridge.setCaptureSource(null);
         setArmedSourceId(null);
+        armedSourceRef.current = null;
         setError(cause instanceof Error ? cause.message : "Could not start preview");
       } finally {
-        setPreviewLoading(false);
+        await waitForMinDuration(loadingStartedAt, PREVIEW_LOADING_MIN_MS);
+        if (armGenerationRef.current === armGeneration) {
+          setPreviewLoading(false);
+        }
       }
     },
-    [bridge, micEnabled, releaseAudioResources, systemAudioEnabled],
+    [bridge, micEnabled, releaseAudioResources, resetPreview, systemAudioEnabled],
   );
 
   const startRecording = useCallback(() => {

@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { filterSourcesByKind } from "~/hooks/use-desktop-sources";
+import { tiltClassForSourceId } from "~/lib/capture-source";
 import { loadingQuips, pickQuip } from "~/lib/quips";
 import { cn } from "~/lib/utils";
 
@@ -168,14 +169,9 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
 
   return (
     <ul className="grid max-h-[min(42vh,380px)] grid-cols-1 gap-2.5 overflow-y-auto pr-0.5 sm:grid-cols-2">
-      {sources.map((source, index) => {
+      {sources.map((source) => {
         const selected = source.id === selectedId;
-        const tilt =
-          !selected && index % 3 === 0
-            ? "-rotate-1"
-            : !selected && index % 3 === 1
-              ? "rotate-1"
-              : "";
+        const tilt = !selected ? tiltClassForSourceId(source.id) : "";
 
         return (
           <li key={source.id} className="min-h-0">

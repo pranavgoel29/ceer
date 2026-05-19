@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { CaptureSourceRef } from "@ceer/contracts";
 import { BrowserGate } from "~/components/recorder/browser-gate";
 import { RecordControls } from "~/components/recorder/record-controls";
 import { RecordStage } from "~/components/recorder/record-stage";
 import { RecorderHeader } from "~/components/recorder/recorder-header";
 import { SourcePicker } from "~/components/recorder/source-picker";
+import { findMatchingSource, toCaptureSourceRef } from "~/lib/capture-source";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { useDesktopSources } from "~/hooks/use-desktop-sources";
 import { useScreenRecorder } from "~/hooks/use-screen-recorder";
@@ -14,19 +16,63 @@ export function RecorderApp() {
   const { sources, loading, error, refresh } = useDesktopSources();
   const recorder = useScreenRecorder();
 
-  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<CaptureSourceRef | null>(null);
   const [areaSourceId, setAreaSourceId] = useState<string | null>(null);
   const [pickingArea, setPickingArea] = useState(false);
+  const selectedSourceRef = useRef<CaptureSourceRef | null>(null);
+
+  useEffect(() => {
+    selectedSourceRef.current = selectedSource;
+  }, [selectedSource]);
+
+  useEffect(() => {
+    if (!selectedSource || sources.length === 0) {
+      return;
+    }
+
+    const match = findMatchingSource(sources, selectedSource);
+    if (!match) {
+      return;
+    }
+
+    if (match.id === selectedSource.id) {
+      return;
+    }
+
+    const next = toCaptureSourceRef(match);
+    setSelectedSource(next);
+    bridge?.setCaptureSource(next);
+  }, [bridge, selectedSource, sources]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (!selectedSourceRef.current) {
+        return;
+      }
+      window.setTimeout(() => {
+        void refresh();
+      }, 400);
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh]);
 
   const handleSelectSource = (sourceId: string) => {
     if (recorder.phase === "recording") {
       return;
     }
 
-    setSelectedSourceId(sourceId);
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    const ref = toCaptureSourceRef(source);
+    setSelectedSource(ref);
     setAreaSourceId(null);
     recorder.discardRecording();
-    void recorder.armPreview(sourceId, null);
+    void recorder.armPreview(ref, null);
   };
 
   const handlePickArea = async (sourceId: string) => {
@@ -34,9 +80,16 @@ export function RecorderApp() {
       return;
     }
 
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    const ref = toCaptureSourceRef(source);
+
     setPickingArea(true);
-    setSelectedSourceId(sourceId);
-    bridge.setCaptureSource(sourceId);
+    setSelectedSource(ref);
+    bridge.setCaptureSource(ref);
 
     const pick = await bridge.pickCaptureRegion(sourceId);
     setPickingArea(false);
@@ -47,29 +100,29 @@ export function RecorderApp() {
 
     setAreaSourceId(sourceId);
     recorder.discardRecording();
-    void recorder.armPreview(sourceId, pick);
+    void recorder.armPreview(ref, pick);
   };
 
-  const rearmIfPossible = (sourceId: string | null) => {
-    if (!sourceId || recorder.phase !== "armed") {
+  const rearmIfPossible = () => {
+    if (!selectedSource || recorder.phase !== "armed") {
       return;
     }
-    void recorder.armPreview(sourceId);
+    void recorder.armPreview(selectedSource);
   };
 
   const handleMicChange = (enabled: boolean) => {
     recorder.setMicEnabled(enabled);
-    rearmIfPossible(selectedSourceId);
+    rearmIfPossible();
   };
 
   const handleSystemAudioChange = (enabled: boolean) => {
     recorder.setSystemAudioEnabled(enabled);
-    rearmIfPossible(selectedSourceId);
+    rearmIfPossible();
   };
 
   const handleDiscard = () => {
     recorder.discardRecording();
-    setSelectedSourceId(null);
+    setSelectedSource(null);
     setAreaSourceId(null);
     bridge?.setCaptureSource(null);
   };
@@ -107,7 +160,7 @@ export function RecorderApp() {
                   sources={sources}
                   loading={loading}
                   error={error}
-                  selectedId={selectedSourceId}
+                  selectedId={selectedSource?.id ?? null}
                   areaSourceId={areaSourceId}
                   pickingArea={pickingArea}
                   disabled={pickerDisabled}

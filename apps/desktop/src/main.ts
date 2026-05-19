@@ -1,16 +1,17 @@
 import { app, BrowserWindow, desktopCapturer, ipcMain, session, systemPreferences } from "electron";
 import path from "node:path";
 
-import type { CapturePreferences, DesktopCaptureSource } from "@ceer/contracts";
+import type { CapturePreferences, CaptureSourceRef, DesktopCaptureSource } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
 import * as IpcChannels from "./ipc/channels.ts";
+import { classifySourceKind, resolveCapturerSource } from "./resolve-capture-source.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
 
 let mainWindow: BrowserWindow | null = null;
-let selectedCaptureSourceId: string | null = null;
+let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 
 function resolvePreloadPath(): string {
@@ -22,14 +23,6 @@ function resolveProductionIndexHtml(): string {
     return path.join(process.resourcesPath, "web", "index.html");
   }
   return path.join(__dirname, "../../web/dist/index.html");
-}
-
-function classifySourceKind(sourceName: string): DesktopCaptureSource["kind"] {
-  const lower = sourceName.toLowerCase();
-  if (lower.includes("screen") || lower.includes("display") || lower.includes("entire")) {
-    return "screen";
-  }
-  return "window";
 }
 
 async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
@@ -56,10 +49,7 @@ function registerDisplayMediaHandler(): void {
         thumbnailSize: { width: 1, height: 1 },
       });
 
-      const picked =
-        (selectedCaptureSourceId
-          ? sources.find((source) => source.id === selectedCaptureSourceId)
-          : undefined) ?? sources[0];
+      const picked = resolveCapturerSource(sources, selectedCaptureSource);
 
       if (!picked) {
         callback({});
@@ -122,8 +112,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.GET_DESKTOP_SOURCES_CHANNEL, () => listDesktopSources());
 
-  ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (_event, sourceId: string | null) => {
-    selectedCaptureSourceId = sourceId;
+  ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (_event, source: CaptureSourceRef | null) => {
+    selectedCaptureSource = source;
   });
 
   ipcMain.on(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, (_event, preferences: CapturePreferences) => {
@@ -173,6 +163,6 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   mainWindow = null;
-  selectedCaptureSourceId = null;
+  selectedCaptureSource = null;
   capturePreferences = { systemAudioEnabled: true };
 });

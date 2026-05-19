@@ -3,7 +3,7 @@ export interface DesktopBridge {
   readonly getAppInfo: () => DesktopAppInfo;
   readonly ping: () => Promise<string>;
   readonly getDesktopSources: () => Promise<DesktopCaptureSource[]>;
-  readonly setCaptureSource: (sourceId: string | null) => void;
+  readonly setCaptureSource: (source: CaptureSourceRef | null) => void;
   readonly setCapturePreferences: (preferences: CapturePreferences) => void;
   /** macOS: prompts for microphone access via systemPreferences. Other platforms: no-op, returns true. */
   readonly requestMicrophoneAccess: () => Promise<boolean>;
@@ -30,6 +30,13 @@ export interface DesktopCaptureSource {
   readonly kind: CaptureSourceKind;
   readonly thumbnailDataUrl: string;
   readonly displayId?: string;
+}
+
+/** Stable handle for a capture target — IDs can change after macOS Exposé / Mission Control. */
+export interface CaptureSourceRef {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: CaptureSourceKind;
 }
 
 /** Rectangle in display logical pixels (origin top-left of the target display). */

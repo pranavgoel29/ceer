@@ -1,13 +1,15 @@
 import type { CaptureSourceKind, DesktopCaptureSource } from "@ceer/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import { SOURCES_LOADING_MIN_MS, waitForMinDuration } from "~/lib/min-duration";
 
 export function useDesktopSources() {
   const bridge = useDesktopBridge();
   const [sources, setSources] = useState<DesktopCaptureSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshGenerationRef = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!bridge) {
@@ -15,17 +17,26 @@ export function useDesktopSources() {
       return;
     }
 
+    const generation = ++refreshGenerationRef.current;
+    const loadingStartedAt = Date.now();
     setLoading(true);
     setError(null);
 
     try {
       const next = await bridge.getDesktopSources();
-      setSources(next);
+      if (refreshGenerationRef.current === generation) {
+        setSources(next);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not list windows");
-      setSources([]);
+      if (refreshGenerationRef.current === generation) {
+        setError(cause instanceof Error ? cause.message : "Could not list windows");
+        setSources([]);
+      }
     } finally {
-      setLoading(false);
+      await waitForMinDuration(loadingStartedAt, SOURCES_LOADING_MIN_MS);
+      if (refreshGenerationRef.current === generation) {
+        setLoading(false);
+      }
     }
   }, [bridge]);
 
