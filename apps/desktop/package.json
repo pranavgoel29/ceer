@@ -1,6 +1,8 @@
 {
   "name": "@ceer/desktop",
   "version": "0.1.0",
+  "description": "Ceer desktop screen recorder",
+  "author": "Pranav Goel",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -22,7 +24,7 @@
     "@types/node": "^22.15.0",
     "electron": "^35.1.2",
     "electron-builder": "^25.1.8",
-    "tsdown": "^0.12.0",
+    "tsdown": "^0.22.0",
     "typescript": "^5.8.3"
   },
   "productName": "Ceer"

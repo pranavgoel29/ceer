@@ -4,6 +4,7 @@ import path from "node:path";
 import type { CaptureRegion, CaptureRegionPickResult, DisplayBounds } from "@ceer/contracts";
 
 import * as IpcChannels from "./ipc/channels.ts";
+import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
 let areaPickerWindow: BrowserWindow | null = null;
 let areaPickerResolver: ((value: CaptureRegionPickResult | null) => void) | null = null;
@@ -14,12 +15,13 @@ function resolveAreaPickerPreloadPath(): string {
   return path.join(__dirname, "area-picker-preload.cjs");
 }
 
-function resolveAreaPickerUrl(): string {
+function loadAreaPickerPage(window: BrowserWindow): void {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
   if (devServerUrl) {
-    return `${devServerUrl}?mode=area-picker`;
+    void window.loadURL(`${devServerUrl}?mode=area-picker`);
+    return;
   }
-  return `file://${path.join(__dirname, "../../web/dist/index.html")}?mode=area-picker`;
+  void window.loadFile(resolveProductionIndexPath(), { query: { mode: "area-picker" } });
 }
 
 async function findDisplayForSource(sourceId: string) {
@@ -116,7 +118,7 @@ export function registerAreaPickerHandlers(): void {
         areaPickerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         areaPickerWindow.setAlwaysOnTop(true, "screen-saver");
 
-        void areaPickerWindow.loadURL(resolveAreaPickerUrl());
+        loadAreaPickerPage(areaPickerWindow);
 
         areaPickerWindow.once("ready-to-show", () => {
           areaPickerWindow?.show();

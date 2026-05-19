@@ -10,6 +10,8 @@ const host = process.env.HOST?.trim() || "localhost";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // Relative asset URLs so Electron `loadFile()` can load the production bundle.
+  base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

@@ -6,6 +6,7 @@ import type { CapturePreferences, CaptureSourceRef, DesktopCaptureSource } from 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { classifySourceKind, resolveCapturerSource } from "./resolve-capture-source.ts";
+import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
@@ -16,13 +17,6 @@ let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 
 function resolvePreloadPath(): string {
   return path.join(__dirname, "preload.cjs");
-}
-
-function resolveProductionIndexHtml(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "web", "index.html");
-  }
-  return path.join(__dirname, "../../web/dist/index.html");
 }
 
 function resolveAppIconPath(): string {
@@ -96,7 +90,7 @@ function createMainWindow(): BrowserWindow {
     void window.loadURL(devServerUrl);
     window.webContents.openDevTools({ mode: "detach" });
   } else {
-    void window.loadFile(resolveProductionIndexHtml());
+    void window.loadFile(resolveProductionIndexPath());
   }
 
   window.once("ready-to-show", () => {

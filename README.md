@@ -78,6 +78,8 @@ cd apps/desktop && bun run start
 
 Build web + desktop, then run [electron-builder](https://www.electron.build/) from `apps/desktop`:
 
+Stop `bun run dev` first — a running dev watcher can slow or interrupt the production build.
+
 ```bash
 # macOS → apps/desktop/release/*.dmg
 bun run dist:mac
