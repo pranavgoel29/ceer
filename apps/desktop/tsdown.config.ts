@@ -12,10 +12,13 @@ export default defineConfig([
     ...shared,
     entry: ["src/main.ts"],
     clean: true,
+    // Must stay external — bundling inlines getElectronPath() and breaks at runtime.
+    external: ["electron"],
     noExternal: (id) => id.startsWith("@ceer/"),
   },
   {
     ...shared,
     entry: ["src/preload.ts"],
+    external: ["electron"],
   },
 ]);

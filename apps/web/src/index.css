@@ -7,6 +7,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+    --ceer-lime: oklch(0.88 0.19 120);
+    --ceer-coral: oklch(0.72 0.19 35);
     --background: oklch(1 0 0);
     --foreground: oklch(0.147 0.004 49.25);
     --card: oklch(1 0 0);
@@ -42,7 +44,9 @@
 }
 
 .dark {
-    --background: oklch(0.147 0.004 49.25);
+    --ceer-lime: oklch(0.88 0.19 120);
+    --ceer-coral: oklch(0.72 0.19 35);
+    --background: oklch(0.13 0.01 55);
     --foreground: oklch(0.985 0.001 106.423);
     --card: oklch(0.216 0.006 56.043);
     --card-foreground: oklch(0.985 0.001 106.423);
@@ -78,6 +82,8 @@
 @theme inline {
     --font-sans: 'Outfit Variable', sans-serif;
     --font-heading: 'Geist Mono Variable', monospace;
+    --color-ceer-lime: var(--ceer-lime);
+    --color-ceer-coral: var(--ceer-coral);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -128,4 +134,114 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer utilities {
+  .ceer-grain::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  .ceer-orb {
+    position: fixed;
+    border-radius: 9999px;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ceer-orb-a {
+    width: 420px;
+    height: 420px;
+    top: -120px;
+    right: -80px;
+    background: color-mix(in oklch, var(--ceer-lime) 35%, transparent);
+    animation: ceer-float 14s ease-in-out infinite;
+  }
+
+  .ceer-orb-b {
+    width: 360px;
+    height: 360px;
+    bottom: -100px;
+    left: -60px;
+    background: color-mix(in oklch, var(--ceer-coral) 28%, transparent);
+    animation: ceer-float 18s ease-in-out infinite reverse;
+  }
+
+  .ceer-wobble {
+    animation: ceer-wobble 4s ease-in-out infinite;
+  }
+
+  .ceer-pulse-border {
+    animation: ceer-pulse-border 1.4s ease-in-out infinite;
+  }
+
+  .ceer-rec-frame {
+    animation: ceer-rec-frame 1.2s steps(2, end) infinite;
+  }
+
+  .ceer-rec-dot::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: currentColor;
+    animation: ceer-blink 1s steps(2, end) infinite;
+  }
+}
+
+@keyframes ceer-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-24px, 16px) scale(1.06);
+  }
+}
+
+@keyframes ceer-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes ceer-pulse-border {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--ceer-lime) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--ceer-lime) 45%, transparent);
+  }
+}
+
+@keyframes ceer-rec-frame {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ceer-lime) 30%, transparent);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--ceer-coral) 50%, transparent);
+  }
+}
+
+@keyframes ceer-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }

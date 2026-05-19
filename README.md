@@ -13,6 +13,10 @@ Screen recorder monorepo:
 - [Bun](https://bun.sh) 1.2+
 - macOS or Windows for distributable builds
 
+### Package manager
+
+This repo uses **Bun** (`bun.lock`, `node_modules/.bun`). If you see a `.pnpm-store` folder at the repo root, it was created incidentally (for example by `bunx shadcn` or a one-off `pnpm` run). It is safe to delete and is gitignored — it is not part of the normal Bun install.
+
 ## Develop
 
 From the repo root:
