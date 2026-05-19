@@ -16,11 +16,14 @@ extraResources:
     to: web
     filter:
       - "**/*"
+  - from: resources/icon.png
+    to: icon.png
 
 asar: true
 
 mac:
   category: public.app-category.video
+  icon: resources/icon.icns
   target:
     - dmg
 
@@ -28,6 +31,7 @@ dmg:
   title: Ceer
 
 win:
+  icon: resources/icon.ico
   target:
     - nsis
 

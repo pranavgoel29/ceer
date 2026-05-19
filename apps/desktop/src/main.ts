@@ -25,6 +25,13 @@ function resolveProductionIndexHtml(): string {
   return path.join(__dirname, "../../web/dist/index.html");
 }
 
+function resolveAppIconPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "icon.png");
+  }
+  return path.join(__dirname, "../resources/icon.png");
+}
+
 async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
   const sources = await desktopCapturer.getSources({
     types: ["screen", "window"],
@@ -75,6 +82,7 @@ function createMainWindow(): BrowserWindow {
     title: appName,
     show: false,
     backgroundColor: "#1c1917",
+    icon: resolveAppIconPath(),
     webPreferences: {
       preload: resolvePreloadPath(),
       contextIsolation: true,
@@ -143,6 +151,10 @@ function registerIpcHandlers(): void {
 app.setName(appName);
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(resolveAppIconPath());
+  }
+
   registerDisplayMediaHandler();
   registerIpcHandlers();
   registerAreaPickerHandlers();
