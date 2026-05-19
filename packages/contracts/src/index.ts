@@ -7,6 +7,8 @@ export interface DesktopBridge {
   readonly setCapturePreferences: (preferences: CapturePreferences) => void;
   /** macOS: prompts for microphone access via systemPreferences. Other platforms: no-op, returns true. */
   readonly requestMicrophoneAccess: () => Promise<boolean>;
+  /** Opens a fullscreen overlay on the source display; null if cancelled. */
+  readonly pickCaptureRegion: (sourceId: string) => Promise<CaptureRegionPickResult | null>;
 }
 
 export interface DesktopAppInfo {
@@ -27,12 +29,38 @@ export interface DesktopCaptureSource {
   readonly name: string;
   readonly kind: CaptureSourceKind;
   readonly thumbnailDataUrl: string;
+  readonly displayId?: string;
+}
+
+/** Rectangle in display logical pixels (origin top-left of the target display). */
+export interface CaptureRegion {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface DisplayBounds {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CaptureRegionPickResult {
+  readonly region: CaptureRegion;
+  readonly display: DisplayBounds;
 }
 
 declare global {
   interface Window {
     desktopBridge?: DesktopBridge;
+    areaPickerBridge?: AreaPickerBridge;
   }
+}
+
+export interface AreaPickerBridge {
+  readonly getBackground: () => string | null;
+  readonly complete: (region: CaptureRegion) => void;
+  readonly cancel: () => void;
 }
 
 export {};

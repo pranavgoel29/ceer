@@ -21,4 +21,9 @@ export default defineConfig([
     entry: ["src/preload.ts"],
     external: ["electron"],
   },
+  {
+    ...shared,
+    entry: ["src/area-picker-preload.ts"],
+    external: ["electron"],
+  },
 ]);

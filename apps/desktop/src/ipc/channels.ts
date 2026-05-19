@@ -4,3 +4,7 @@ export const GET_DESKTOP_SOURCES_CHANNEL = "ceer:get-desktop-sources" as const;
 export const SET_CAPTURE_SOURCE_CHANNEL = "ceer:set-capture-source" as const;
 export const REQUEST_MICROPHONE_ACCESS_CHANNEL = "ceer:request-microphone-access" as const;
 export const SET_CAPTURE_PREFERENCES_CHANNEL = "ceer:set-capture-preferences" as const;
+export const PICK_CAPTURE_REGION_CHANNEL = "ceer:pick-capture-region" as const;
+export const AREA_PICKER_COMPLETE_CHANNEL = "ceer:area-picker-complete" as const;
+export const AREA_PICKER_CANCEL_CHANNEL = "ceer:area-picker-cancel" as const;
+export const GET_AREA_PICKER_BACKGROUND_CHANNEL = "ceer:get-area-picker-background" as const;

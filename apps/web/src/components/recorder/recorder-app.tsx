@@ -22,6 +22,8 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
   const recorder = useScreenRecorder();
 
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [areaSourceId, setAreaSourceId] = useState<string | null>(null);
+  const [pickingArea, setPickingArea] = useState(false);
   const [quip, setQuip] = useState<string>(() => pickQuip(idleQuips));
 
   useEffect(() => {
@@ -42,8 +44,30 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
     }
 
     setSelectedSourceId(sourceId);
+    setAreaSourceId(null);
     recorder.discardRecording();
-    void recorder.armPreview(sourceId);
+    void recorder.armPreview(sourceId, null);
+  };
+
+  const handlePickArea = async (sourceId: string) => {
+    if (!bridge || recorder.phase === "recording") {
+      return;
+    }
+
+    setPickingArea(true);
+    setSelectedSourceId(sourceId);
+    bridge.setCaptureSource(sourceId);
+
+    const pick = await bridge.pickCaptureRegion(sourceId);
+    setPickingArea(false);
+
+    if (!pick) {
+      return;
+    }
+
+    setAreaSourceId(sourceId);
+    recorder.discardRecording();
+    void recorder.armPreview(sourceId, pick);
   };
 
   const rearmIfPossible = (sourceId: string | null) => {
@@ -66,6 +90,7 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
   const handleDiscard = () => {
     recorder.discardRecording();
     setSelectedSourceId(null);
+    setAreaSourceId(null);
     bridge?.setCaptureSource(null);
   };
 
@@ -98,9 +123,12 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
             loading={loading}
             error={error}
             selectedId={selectedSourceId}
+            areaSourceId={areaSourceId}
+            pickingArea={pickingArea}
             disabled={pickerDisabled}
             onRefresh={() => void refresh()}
             onSelect={handleSelectSource}
+            onPickArea={(sourceId) => void handlePickArea(sourceId)}
           />
 
           <RecordStage
@@ -108,6 +136,7 @@ export function RecorderApp({ appInfo }: RecorderAppProps) {
             previewStream={recorder.previewStream}
             recordingUrl={recorder.recording?.url ?? null}
             elapsedMs={recorder.elapsedMs}
+            captureRegion={recorder.captureRegion}
           />
 
           <RecordControls

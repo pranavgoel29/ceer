@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { CapturePreferences, DesktopCaptureSource } from "@ceer/contracts";
 
+import { registerAreaPickerHandlers } from "./area-picker.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
@@ -43,6 +44,7 @@ async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
     name: source.name,
     kind: classifySourceKind(source.name),
     thumbnailDataUrl: source.thumbnail.toDataURL(),
+    displayId: source.display_id,
   }));
 }
 
@@ -153,6 +155,7 @@ app.setName(appName);
 app.whenReady().then(() => {
   registerDisplayMediaHandler();
   registerIpcHandlers();
+  registerAreaPickerHandlers();
   mainWindow = createMainWindow();
 
   app.on("activate", () => {

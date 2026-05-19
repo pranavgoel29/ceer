@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { CaptureRegion, CaptureRegionPickResult, DisplayBounds } from "@ceer/contracts";
+
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
+import { cropVideoStream } from "~/lib/crop-video-stream";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 
 export type RecorderPhase = "idle" | "armed" | "recording" | "stopped";
@@ -38,6 +41,8 @@ export function useScreenRecorder() {
   const [micEnabled, setMicEnabled] = useState(true);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
   const [armedSourceId, setArmedSourceId] = useState<string | null>(null);
+  const [captureRegion, setCaptureRegion] = useState<CaptureRegion | null>(null);
+  const [captureDisplay, setCaptureDisplay] = useState<DisplayBounds | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -45,7 +50,9 @@ export function useScreenRecorder() {
   const timerRef = useRef<number | null>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
+  const cropCleanupRef = useRef<(() => void) | null>(null);
   const micStreamsRef = useRef<MediaStream[]>([]);
+  const regionPickRef = useRef<CaptureRegionPickResult | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -57,6 +64,8 @@ export function useScreenRecorder() {
   const releaseAudioResources = useCallback(() => {
     audioCleanupRef.current?.();
     audioCleanupRef.current = null;
+    cropCleanupRef.current?.();
+    cropCleanupRef.current = null;
     for (const stream of micStreamsRef.current) {
       stopStream(stream);
     }
@@ -71,6 +80,9 @@ export function useScreenRecorder() {
     setPhase("idle");
     setElapsedMs(0);
     setArmedSourceId(null);
+    setCaptureRegion(null);
+    setCaptureDisplay(null);
+    regionPickRef.current = null;
     startedAtRef.current = null;
     clearTimer();
   }, [clearTimer, releaseAudioResources]);
@@ -80,12 +92,17 @@ export function useScreenRecorder() {
   }, [bridge, systemAudioEnabled]);
 
   const armPreview = useCallback(
-    async (sourceId: string) => {
+    async (sourceId: string, regionPick?: CaptureRegionPickResult | null) => {
       if (!bridge) {
         setError("Open Ceer in Electron to capture the desktop.");
         return;
       }
 
+      if (regionPick !== undefined) {
+        regionPickRef.current = regionPick;
+      }
+
+      const activeRegionPick = regionPickRef.current;
       setError(null);
       releaseAudioResources();
       stopStream(previewStreamRef.current);
@@ -132,10 +149,31 @@ export function useScreenRecorder() {
           }
         }
 
-        const { stream, cleanup } = await attachAudioToVideoStream(displayStream, audioStreams);
-        audioCleanupRef.current = cleanup;
-        previewStreamRef.current = stream;
-        setPreviewStream(stream);
+        let outputStream: MediaStream;
+        const { stream: mixedStream, cleanup: audioCleanup } = await attachAudioToVideoStream(
+          displayStream,
+          audioStreams,
+        );
+        audioCleanupRef.current = audioCleanup;
+
+        if (activeRegionPick) {
+          const { stream: cropped, cleanup: cropCleanup } = await cropVideoStream(
+            mixedStream,
+            activeRegionPick.region,
+            activeRegionPick.display,
+          );
+          cropCleanupRef.current = cropCleanup;
+          outputStream = cropped;
+          setCaptureRegion(activeRegionPick.region);
+          setCaptureDisplay(activeRegionPick.display);
+        } else {
+          outputStream = mixedStream;
+          setCaptureRegion(null);
+          setCaptureDisplay(null);
+        }
+
+        previewStreamRef.current = outputStream;
+        setPreviewStream(outputStream);
         setArmedSourceId(sourceId);
         setPhase("armed");
       } catch (cause) {
@@ -236,6 +274,7 @@ export function useScreenRecorder() {
     micEnabled,
     systemAudioEnabled,
     armedSourceId,
+    captureRegion,
     setMicEnabled,
     setSystemAudioEnabled,
     armPreview,

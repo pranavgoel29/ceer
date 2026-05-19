@@ -134,6 +134,12 @@
   html {
     @apply font-sans;
     }
+  html.area-picker-root,
+  body.area-picker-root,
+  html.area-picker-root #root {
+    background: transparent !important;
+    overflow: hidden;
+  }
 }
 
 @layer utilities {

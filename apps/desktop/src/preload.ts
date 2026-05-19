@@ -15,6 +15,8 @@ const desktopBridge: DesktopBridge = {
   },
   requestMicrophoneAccess: () =>
     ipcRenderer.invoke(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL),
+  pickCaptureRegion: (sourceId) =>
+    ipcRenderer.invoke(IpcChannels.PICK_CAPTURE_REGION_CHANNEL, sourceId),
 };
 
 contextBridge.exposeInMainWorld("desktopBridge", desktopBridge);

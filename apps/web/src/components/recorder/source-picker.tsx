@@ -14,9 +14,12 @@ interface SourcePickerProps {
   readonly loading: boolean;
   readonly error: string | null;
   readonly selectedId: string | null;
+  readonly areaSourceId: string | null;
+  readonly pickingArea?: boolean;
   readonly disabled?: boolean;
   readonly onRefresh: () => void;
   readonly onSelect: (sourceId: string) => void;
+  readonly onPickArea: (sourceId: string) => void;
 }
 
 const tabMeta: { value: CaptureSourceKind | "all"; label: string }[] = [
@@ -30,9 +33,12 @@ export function SourcePicker({
   loading,
   error,
   selectedId,
+  areaSourceId,
+  pickingArea = false,
   disabled,
   onRefresh,
   onSelect,
+  onPickArea,
 }: SourcePickerProps) {
   const [tab, setTab] = useState<CaptureSourceKind | "all">("all");
 
@@ -78,18 +84,14 @@ export function SourcePicker({
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <div
-          title="Record full source now — trim & crop in the editor later."
-          className="flex w-full cursor-not-allowed items-center justify-between rounded-2xl border border-dashed border-muted-foreground/30 px-4 py-3 text-left text-sm text-muted-foreground opacity-70"
-        >
-          <span className="flex items-center gap-2">
-            <SquareIcon className="size-4" />
-            Area crop (v0.2)
-          </span>
-          <Badge variant="secondary" className="text-[10px]">
-            soon
-          </Badge>
-        </div>
+        <AreaPickSection
+          sources={sources}
+          selectedId={selectedId}
+          areaSourceId={areaSourceId}
+          pickingArea={pickingArea}
+          disabled={disabled}
+          onPickArea={onPickArea}
+        />
       </CardContent>
     </Card>
   );
@@ -101,6 +103,52 @@ interface SourceGridProps {
   readonly loading: boolean;
   readonly disabled?: boolean;
   readonly onSelect: (sourceId: string) => void;
+}
+
+function AreaPickSection({
+  sources,
+  selectedId,
+  areaSourceId,
+  pickingArea,
+  disabled,
+  onPickArea,
+}: {
+  sources: DesktopCaptureSource[];
+  selectedId: string | null;
+  areaSourceId: string | null;
+  pickingArea: boolean;
+  disabled?: boolean;
+  onPickArea: (sourceId: string) => void;
+}) {
+  const screenSources = sources.filter((source) => source.kind === "screen");
+  const targetId = selectedId && screenSources.some((s) => s.id === selectedId) ? selectedId : screenSources[0]?.id;
+  const canPick = Boolean(targetId) && !disabled && !pickingArea;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-ceer-lime/30 bg-ceer-lime/5 p-3">
+      <div className="flex items-start gap-2">
+        <SquareIcon className="mt-0.5 size-4 shrink-0 text-ceer-lime" weight="duotone" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Snip a region</p>
+          <p className="text-xs text-muted-foreground">
+            {screenSources.length === 0
+              ? "Pick a display under Screens first."
+              : "Drag a rectangle on the display, then we crop the capture."}
+          </p>
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={!canPick}
+        onClick={() => targetId && onPickArea(targetId)}
+      >
+        {pickingArea ? "Drawing…" : areaSourceId === targetId ? "Redraw area" : "Select area"}
+      </Button>
+    </div>
+  );
 }
 
 function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: SourceGridProps) {

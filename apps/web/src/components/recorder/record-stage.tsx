@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent } from "~/components/ui/card";
+import type { CaptureRegion } from "@ceer/contracts";
 import type { RecorderPhase } from "~/hooks/use-screen-recorder";
 import { formatDuration } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -12,9 +13,16 @@ interface RecordStageProps {
   readonly previewStream: MediaStream | null;
   readonly recordingUrl: string | null;
   readonly elapsedMs: number;
+  readonly captureRegion: CaptureRegion | null;
 }
 
-export function RecordStage({ phase, previewStream, recordingUrl, elapsedMs }: RecordStageProps) {
+export function RecordStage({
+  phase,
+  previewStream,
+  recordingUrl,
+  elapsedMs,
+  captureRegion,
+}: RecordStageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -46,7 +54,9 @@ export function RecordStage({ phase, previewStream, recordingUrl, elapsedMs }: R
             </Badge>
           ) : (
             <Badge variant="outline" className="font-mono text-[10px] uppercase">
-              {phase}
+              {captureRegion
+                ? `area ${captureRegion.width}×${captureRegion.height}`
+                : phase}
             </Badge>
           )}
         </div>
