@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { filterSourcesByKind } from "~/hooks/use-desktop-sources";
 import { tiltClassForSourceId } from "~/lib/capture-source";
 import { loadingQuips, pickQuip } from "~/lib/quips";
@@ -43,6 +44,9 @@ export function SourcePicker({
   onPickArea,
 }: SourcePickerProps) {
   const [tab, setTab] = useState<CaptureSourceKind | "all">("all");
+  const bridge = useDesktopBridge();
+  const isMac = bridge?.getAppInfo().platform === "darwin";
+  const windowSources = filterSourcesByKind(sources, "window");
 
   return (
     <RecorderPanel
@@ -79,10 +83,22 @@ export function SourcePicker({
               disabled={disabled}
               loading={loading}
               onSelect={onSelect}
+              emptyHint={
+                isMac && item.value === "window" && windowSources.length === 0
+                  ? "No windows listed — fullscreen apps are usually only available as a Screen on macOS."
+                  : undefined
+              }
             />
           </TabsContent>
         ))}
       </Tabs>
+
+      {isMac ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          On macOS, apps in native fullscreen usually do not appear under Windows — choose the
+          matching Screen to record them.
+        </p>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -121,8 +137,10 @@ function AreaPickSection({
   disabled?: boolean;
   onPickArea: (sourceId: string) => void;
 }) {
-  const screenSources = sources.filter((source) => source.kind === "screen");
-  const targetId = selectedId && screenSources.some((s) => s.id === selectedId) ? selectedId : screenSources[0]?.id;
+  const targetId =
+    selectedId && sources.some((source) => source.id === selectedId)
+      ? selectedId
+      : sources[0]?.id;
   const canPick = Boolean(targetId) && !disabled && !pickingArea;
 
   return (
@@ -134,9 +152,9 @@ function AreaPickSection({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">Snip a region</p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {screenSources.length === 0
-              ? "Choose a display under Screens first."
-              : "Draw a rectangle on the display; we crop the capture to match."}
+            {sources.length === 0
+              ? "Refresh sources, then pick a screen or window."
+              : "Opens an overlay — switch targets there, then draw a crop region."}
           </p>
         </div>
       </div>
@@ -154,7 +172,14 @@ function AreaPickSection({
   );
 }
 
-function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: SourceGridProps) {
+function SourceGrid({
+  sources,
+  selectedId,
+  loading,
+  disabled,
+  onSelect,
+  emptyHint,
+}: SourceGridProps & { readonly emptyHint?: string }) {
   if (loading && sources.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">{pickQuip(loadingQuips)}</p>
@@ -163,7 +188,9 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
 
   if (sources.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-muted-foreground">Nothing here. Try another tab?</p>
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        {emptyHint ?? "Nothing here. Try another tab?"}
+      </p>
     );
   }
 

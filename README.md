@@ -29,8 +29,11 @@ Shared everywhere:
 **Desktop (Electron)**
 
 - **System audio** on macOS needs **macOS 13+** and **Screen Recording** permission. Loopback is most reliable for **full screen** capture; window-only capture may have no audio.
+- **Fullscreen apps on macOS** — Electron’s window list usually omits apps on a separate fullscreen Space; record them by choosing the matching **Screen**, not **Windows**.
 - **Microphone** uses `getUserMedia`; grant access in System Settings when prompted.
-- **Area crop** opens a fullscreen overlay (`area-picker`) to drag a region on the chosen display.
+- **Area crop** opens a fullscreen overlay (`area-picker`) with a source strip (screens and windows), then drag a region on that display. Region capture uses the matching screen stream; window picks in the overlay help you choose the display.
+- **Menu bar tray** (right-click on macOS) and **floating control bar** — start/stop while hidden; stopping a recording reopens the window for export; close hides to tray instead of quitting.
+- **Notifications** when recording starts and stops (click to focus the app).
 
 **Browser**
 
@@ -42,7 +45,7 @@ Shared everywhere:
 
 ### Desktop
 
-1. Pick a **screen** or **window** in the left sidebar (`SourcePicker`), or **snip a region** on a display.
+1. Pick a **screen** or **window** in the left sidebar (`SourcePicker`), or **snip a region** (overlay lets you switch targets, then draw).
 2. Electron main resolves the source and handles `getDisplayMedia` via `desktopCapturer`.
 3. Preview arms (`phase: armed`) — mix system audio + mic in the renderer (`audio-mix.ts`), optional crop (`crop-video-stream.ts`).
 4. **Roll tape** → WebM chunks → stop → export or download master.
@@ -277,6 +280,7 @@ ceer/
 │   │   │   ├── main.ts              # Window, display-media handler, IPC
 │   │   │   ├── preload.ts           # desktopBridge
 │   │   │   ├── area-picker.ts       # Region overlay window
+│   │   │   ├── recording-control.ts # Tray, HUD, notifications
 │   │   │   ├── resolve-capture-source.ts
 │   │   │   └── resolve-renderer.ts
 │   │   ├── scripts/
@@ -296,7 +300,8 @@ ceer/
 │           │   ├── record-stage.tsx
 │           │   ├── record-controls.tsx
 │           │   ├── recorder-header.tsx
-│           │   └── area-picker-page.tsx
+│           │   ├── area-picker-page.tsx
+│           │   └── control-widget-page.tsx
 │           ├── hooks/
 │           │   ├── use-desktop-recorder.ts
 │           │   ├── use-web-recorder.ts

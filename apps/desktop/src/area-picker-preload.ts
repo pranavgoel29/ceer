@@ -11,6 +11,16 @@ const areaPickerBridge = {
       | undefined;
     return dataUrl || null;
   },
+  getSources: () => ipcRenderer.sendSync(IpcChannels.GET_AREA_PICKER_SOURCES_CHANNEL),
+  getActiveSource: () => ipcRenderer.sendSync(IpcChannels.GET_AREA_PICKER_ACTIVE_SOURCE_CHANNEL),
+  setSource: (sourceId: string) => ipcRenderer.invoke(IpcChannels.SET_AREA_PICKER_SOURCE_CHANNEL, sourceId),
+  onSourceChanged: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(IpcChannels.AREA_PICKER_SOURCE_CHANGED_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.AREA_PICKER_SOURCE_CHANGED_CHANNEL, handler);
+    };
+  },
   complete: (region: CaptureRegion) => {
     ipcRenderer.send(IpcChannels.AREA_PICKER_COMPLETE_CHANNEL, region);
   },

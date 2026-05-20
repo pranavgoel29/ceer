@@ -1,11 +1,17 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, session, systemPreferences } from "electron";
+import { app, BrowserWindow, ipcMain, session, systemPreferences } from "electron";
 import path from "node:path";
 
-import type { CapturePreferences, CaptureSourceRef, DesktopCaptureSource } from "@ceer/contracts";
+import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
+import { registerDisplayMediaHandler } from "./display-media-handler.ts";
 import * as IpcChannels from "./ipc/channels.ts";
-import { classifySourceKind, resolveCapturerSource } from "./resolve-capture-source.ts";
+import { listDesktopSources } from "./list-desktop-sources.ts";
+import {
+  attachMainWindowCloseBehavior,
+  handleAppActivate,
+  registerRecordingControl,
+} from "./recording-control.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
@@ -16,8 +22,10 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 
+let mainWindow: BrowserWindow | null = null;
 let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
+let isQuitting = false;
 
 function resolvePreloadPath(): string {
   return path.join(__dirname, "preload.cjs");
@@ -31,45 +39,11 @@ function resolveAppIconPath(): string {
   return path.join(__dirname, "../resources", iconFile);
 }
 
-async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
-  const sources = await desktopCapturer.getSources({
-    types: ["screen", "window"],
-    thumbnailSize: { width: 360, height: 203 },
-    fetchWindowIcons: true,
-  });
-
-  return sources.map((source) => ({
-    id: source.id,
-    name: source.name,
-    kind: classifySourceKind(source.name),
-    thumbnailDataUrl: source.thumbnail.toDataURL(),
-    displayId: source.display_id,
+function wireDisplayMediaHandler(): void {
+  registerDisplayMediaHandler(session.defaultSession, () => ({
+    selectedCaptureSource,
+    capturePreferences,
   }));
-}
-
-function registerDisplayMediaHandler(): void {
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    void (async () => {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 1, height: 1 },
-      });
-
-      const picked = resolveCapturerSource(sources, selectedCaptureSource);
-
-      if (!picked) {
-        callback({});
-        return;
-      }
-
-      const wantsSystemAudio = capturePreferences.systemAudioEnabled && request.audioRequested;
-
-      callback({
-        video: picked,
-        ...(wantsSystemAudio ? { audio: "loopback" as const } : {}),
-      });
-    })();
-  });
 }
 
 function createMainWindow(): BrowserWindow {
@@ -102,6 +76,8 @@ function createMainWindow(): BrowserWindow {
     window.show();
   });
 
+  attachMainWindowCloseBehavior(window, () => !isQuitting);
+  mainWindow = window;
   return window;
 }
 
@@ -149,6 +125,31 @@ function registerIpcHandlers(): void {
   });
 }
 
+function initializeApp(): void {
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(resolveAppIconPath());
+  }
+
+  wireDisplayMediaHandler();
+  registerIpcHandlers();
+  registerAreaPickerHandlers(() => mainWindow);
+  registerRecordingControl({
+    getMainWindow: () => mainWindow,
+    setCaptureSource: (source) => {
+      selectedCaptureSource = source;
+    },
+  });
+  createMainWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createMainWindow();
+      return;
+    }
+    handleAppActivate();
+  });
+}
+
 app.setName(appName);
 
 if (process.platform === "win32") {
@@ -157,31 +158,16 @@ if (process.platform === "win32") {
 
 if (hasSingleInstanceLock) {
   app.on("second-instance", () => {
-    const existing = BrowserWindow.getAllWindows()[0];
-    if (existing) {
-      if (existing.isMinimized()) {
-        existing.restore();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
       }
-      existing.focus();
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
 
-  app.whenReady().then(() => {
-    if (process.platform === "darwin" && app.dock) {
-      app.dock.setIcon(resolveAppIconPath());
-    }
-
-    registerDisplayMediaHandler();
-    registerIpcHandlers();
-    registerAreaPickerHandlers();
-    createMainWindow();
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-      }
-    });
-  });
+  app.on("ready", initializeApp);
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
@@ -190,6 +176,7 @@ if (hasSingleInstanceLock) {
   });
 
   app.on("before-quit", () => {
+    isQuitting = true;
     selectedCaptureSource = null;
     capturePreferences = { systemAudioEnabled: true };
   });

@@ -1,18 +1,8 @@
-import type { CaptureSourceRef, DesktopCaptureSource } from "@ceer/contracts";
-
-export function toCaptureSourceRef(source: DesktopCaptureSource): CaptureSourceRef {
-  return { id: source.id, name: source.name, kind: source.kind };
-}
-
-export function findMatchingSource(
-  sources: DesktopCaptureSource[],
-  ref: CaptureSourceRef,
-): DesktopCaptureSource | undefined {
-  return (
-    sources.find((source) => source.id === ref.id) ??
-    sources.find((source) => source.name === ref.name && source.kind === ref.kind)
-  );
-}
+export {
+  findMatchingSource,
+  isSameCaptureSource,
+  toCaptureSourceRef,
+} from "@ceer/contracts";
 
 /** Stable visual variant from id so grid tiles do not jump when list order changes. */
 export function tiltClassForSourceId(sourceId: string): string {

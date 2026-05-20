@@ -217,9 +217,25 @@
     background: transparent !important;
     overflow: hidden;
   }
+  html.control-widget-root,
+  body.control-widget-root,
+  html.control-widget-root #root {
+    background: transparent !important;
+    overflow: hidden;
+  }
 }
 
 @layer utilities {
+  .ceer-control-widget-drag {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .ceer-control-widget-no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
   .ceer-grain::before {
     content: "";
     pointer-events: none;
