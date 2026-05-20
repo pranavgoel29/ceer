@@ -1,15 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="coral" x1="188" y1="134" x2="820" y2="892" gradientUnits="userSpaceOnUse">
-      <stop stop-color="rgb(255 111 74)"/>
-      <stop offset="1" stop-color="rgb(209 91 60)"/>
+      <stop stop-color="rgb(255, 111, 74)"/>
+      <stop offset="1" stop-color="rgb(209, 91, 60)"/>
     </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#000" flood-opacity="0.22"/>
+    <linearGradient id="edgeHighlightTop" x1="512" y1="126" x2="512" y2="210" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.38"/>
+      <stop offset="0.12" stop-color="#fff" stop-opacity="0.12"/>
+      <stop offset="0.28" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edgeHighlightLeft" x1="126" y1="512" x2="210" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="0.12" stop-color="#fff" stop-opacity="0.09"/>
+      <stop offset="0.28" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edgeShadowBottom" x1="512" y1="898" x2="512" y2="814" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000" stop-opacity="0.32"/>
+      <stop offset="0.12" stop-color="#000" stop-opacity="0.11"/>
+      <stop offset="0.28" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edgeShadowRight" x1="898" y1="512" x2="814" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000" stop-opacity="0.22"/>
+      <stop offset="0.12" stop-color="#000" stop-opacity="0.07"/>
+      <stop offset="0.28" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="cornerHighlightTopLeft" cx="126" cy="126" r="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.45"/>
+      <stop offset="0.35" stop-color="#fff" stop-opacity="0.08"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cornerShadowBottomRight" cx="898" cy="898" r="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000" stop-opacity="0.28"/>
+      <stop offset="0.35" stop-color="#000" stop-opacity="0.06"/>
+      <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="squircle">
+      <rect x="126" y="126" width="772" height="772" rx="214"/>
+    </clipPath>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="34" result="blur"/>
+      <feOffset in="blur" dx="0" dy="34" result="offset"/>
+      <feFlood flood-color="#000" flood-opacity="0.22" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
   </defs>
   <rect x="126" y="126" width="772" height="772" rx="214" fill="url(#coral)" filter="url(#softShadow)"/>
-  <circle cx="512" cy="512" r="168" fill="#ffffff"/>
-  <circle cx="512" cy="512" r="136" fill="url(#coral)"/>
-  <circle cx="512" cy="512" r="106" fill="#ffffff"/>
+  <g clip-path="url(#squircle)">
+    <rect x="126" y="126" width="772" height="772" rx="214" fill="url(#coral)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#edgeShadowBottom)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#edgeShadowRight)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#cornerShadowBottomRight)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#edgeHighlightTop)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#edgeHighlightLeft)"/>
+    <rect x="126" y="126" width="772" height="772" fill="url(#cornerHighlightTopLeft)"/>
+  </g>
+  <g clip-path="url(#squircle)">
+    <circle cx="512" cy="512" r="168" fill="#ffffff"/>
+    <circle cx="512" cy="512" r="136" fill="url(#coral)"/>
+    <circle cx="512" cy="512" r="106" fill="#ffffff"/>
+  </g>
 </svg>

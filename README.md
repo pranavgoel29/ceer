@@ -240,7 +240,7 @@ Edit `apps/desktop/resources/icon.svg`, then regenerate raster assets (desktop d
 bun run generate:icons
 ```
 
-Outputs `icon.png`, `icon.icns`, `icon.ico`, `icon.iconset/`, plus web-only `favicon.svg` (tighter crop), `favicon.ico`, `favicon-32.png`, and `favicon-192.png`. `scripts/generate-icons.ts` parses `icon.svg` in pure Node (no npm deps); `.icns` uses macOS `iconutil`. Vite serves the `favicon.*` assets from `apps/desktop/resources/`.
+Outputs `icon.png`, `icon.icns`, `icon.ico`, `icon.iconset/`, plus web-only `favicon.svg` (tighter crop), `favicon.ico`, `favicon-32.png`, and `favicon-192.png`. `scripts/generate-icons.ts` rasterizes `icon.svg` with `@resvg/resvg-js` (PNG/ICO match the SVG); `.icns` uses macOS `iconutil`. Vite serves the `favicon.*` assets from `apps/desktop/resources/`.
 
 ## Package installers
 
