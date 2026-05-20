@@ -11,7 +11,6 @@ import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
 
-let mainWindow: BrowserWindow | null = null;
 let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 
@@ -152,11 +151,11 @@ app.whenReady().then(() => {
   registerDisplayMediaHandler();
   registerIpcHandlers();
   registerAreaPickerHandlers();
-  mainWindow = createMainWindow();
+  createMainWindow();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
+      createMainWindow();
     }
   });
 });
@@ -168,7 +167,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  mainWindow = null;
   selectedCaptureSource = null;
   capturePreferences = { systemAudioEnabled: true };
 });

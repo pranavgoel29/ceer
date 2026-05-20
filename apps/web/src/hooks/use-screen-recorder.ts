@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type {
-  CaptureRegion,
-  CaptureRegionPickResult,
-  CaptureSourceRef,
-  DisplayBounds,
-} from "@ceer/contracts";
+import type { CaptureRegion, CaptureRegionPickResult, CaptureSourceRef } from "@ceer/contracts";
 
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
 import { cropVideoStream } from "~/lib/crop-video-stream";
@@ -61,7 +56,6 @@ export function useScreenRecorder() {
   }, []);
   const [armedSourceId, setArmedSourceId] = useState<string | null>(null);
   const [captureRegion, setCaptureRegion] = useState<CaptureRegion | null>(null);
-  const [captureDisplay, setCaptureDisplay] = useState<DisplayBounds | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewLoadingMessage, setPreviewLoadingMessage] = useState(() => pickQuip(loadingQuips));
 
@@ -76,6 +70,29 @@ export function useScreenRecorder() {
   const regionPickRef = useRef<CaptureRegionPickResult | null>(null);
   const armedSourceRef = useRef<CaptureSourceRef | null>(null);
   const armGenerationRef = useRef(0);
+  const phaseRef = useRef<RecorderPhase>("idle");
+
+  phaseRef.current = phase;
+
+  const isActiveArm = (generation: number) => armGenerationRef.current === generation;
+
+  const disposeArmAttempt = useCallback(
+    (displayStream: MediaStream | null, outputStream: MediaStream | null) => {
+      audioCleanupRef.current?.();
+      audioCleanupRef.current = null;
+      cropCleanupRef.current?.();
+      cropCleanupRef.current = null;
+      for (const stream of micStreamsRef.current) {
+        stopStream(stream);
+      }
+      micStreamsRef.current = [];
+      if (outputStream && outputStream !== displayStream) {
+        stopStream(outputStream);
+      }
+      stopStream(displayStream);
+    },
+    [],
+  );
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -104,7 +121,6 @@ export function useScreenRecorder() {
     setElapsedMs(0);
     setArmedSourceId(null);
     setCaptureRegion(null);
-    setCaptureDisplay(null);
     regionPickRef.current = null;
     armedSourceRef.current = null;
     startedAtRef.current = null;
@@ -142,21 +158,37 @@ export function useScreenRecorder() {
       bridge.setCapturePreferences({ systemAudioEnabled: wantsSystemAudio });
       bridge.setCaptureSource(source);
 
+      let displayStream: MediaStream | null = null;
+      let outputStream: MediaStream | null = null;
+
       try {
-        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: wantsSystemAudio,
         });
 
-        const audioStreams: MediaStream[] = [];
-        const systemTracks = displayStream.getAudioTracks();
+        if (!isActiveArm(armGeneration)) {
+          disposeArmAttempt(displayStream, null);
+          return;
+        }
 
-        if (systemTracks.length > 0) {
-          audioStreams.push(new MediaStream(systemTracks));
-        } else if (wantsSystemAudio) {
-          setError(
-            "System audio unavailable. On macOS you need 13+ and Screen Recording permission; window-only capture may have no audio.",
-          );
+        const audioStreams: MediaStream[] = [];
+        const wantsSystemAudioNow = systemAudioEnabledRef.current;
+
+        if (!wantsSystemAudioNow) {
+          for (const track of displayStream.getAudioTracks()) {
+            displayStream.removeTrack(track);
+            track.stop();
+          }
+        } else {
+          const systemTracks = displayStream.getAudioTracks();
+          if (systemTracks.length > 0) {
+            audioStreams.push(new MediaStream(systemTracks));
+          } else {
+            setError(
+              "System audio unavailable. On macOS you need 13+ and Screen Recording permission; window-only capture may have no audio.",
+            );
+          }
         }
 
         if (micEnabledRef.current) {
@@ -167,22 +199,28 @@ export function useScreenRecorder() {
                 noiseSuppression: true,
               },
             });
-            if (armGenerationRef.current !== armGeneration || !micEnabledRef.current) {
+            if (!isActiveArm(armGeneration) || !micEnabledRef.current) {
               stopStream(micStream);
             } else {
               micStreamsRef.current.push(micStream);
               audioStreams.push(micStream);
             }
           } catch {
-            setError((previous) =>
-              previous
-                ? `${previous} Microphone permission denied.`
-                : "Microphone permission denied — allow mic access in System Settings.",
-            );
+            if (isActiveArm(armGeneration)) {
+              setError((previous) =>
+                previous
+                  ? `${previous} Microphone permission denied.`
+                  : "Microphone permission denied — allow mic access in System Settings.",
+              );
+            }
           }
         }
 
-        let outputStream: MediaStream;
+        if (!isActiveArm(armGeneration)) {
+          disposeArmAttempt(displayStream, null);
+          return;
+        }
+
         const { stream: mixedStream, cleanup: audioCleanup } = await attachAudioToVideoStream(
           displayStream,
           audioStreams,
@@ -197,24 +235,26 @@ export function useScreenRecorder() {
           );
           cropCleanupRef.current = cropCleanup;
           outputStream = cropped;
-          setCaptureRegion(activeRegionPick.region);
-          setCaptureDisplay(activeRegionPick.display);
         } else {
           outputStream = mixedStream;
-          setCaptureRegion(null);
-          setCaptureDisplay(null);
+        }
+
+        if (!isActiveArm(armGeneration)) {
+          disposeArmAttempt(displayStream, outputStream);
+          return;
         }
 
         previewStreamRef.current = outputStream;
         setPreviewStream(outputStream);
         setArmedSourceId(source.id);
         armedSourceRef.current = source;
+        setCaptureRegion(activeRegionPick?.region ?? null);
         setPhase("armed");
 
         const videoTrack = outputStream.getVideoTracks()[0];
         if (videoTrack) {
           videoTrack.onended = () => {
-            if (armGenerationRef.current !== armGeneration) {
+            if (!isActiveArm(armGeneration)) {
               return;
             }
             setError("Capture was interrupted — select the source again.");
@@ -223,6 +263,9 @@ export function useScreenRecorder() {
           };
         }
       } catch (cause) {
+        if (displayStream || outputStream) {
+          disposeArmAttempt(displayStream, outputStream);
+        }
         bridge.setCaptureSource(null);
         setArmedSourceId(null);
         armedSourceRef.current = null;
@@ -234,18 +277,19 @@ export function useScreenRecorder() {
         }
       }
     },
-    [bridge, releaseAudioResources, resetPreview],
+    [bridge, disposeArmAttempt, releaseAudioResources, resetPreview],
   );
 
   const startRecording = useCallback(() => {
-    if (!previewStream || phase !== "armed") {
+    const stream = previewStreamRef.current;
+    if (!stream || phaseRef.current !== "armed") {
       return;
     }
 
     const mimeType = pickRecorderMimeType();
 
     chunksRef.current = [];
-    const recorder = new MediaRecorder(previewStream, { mimeType });
+    const recorder = new MediaRecorder(stream, { mimeType });
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -286,7 +330,7 @@ export function useScreenRecorder() {
 
     recorder.start(250);
     setPhase("recording");
-  }, [bridge, clearTimer, phase, previewStream, releaseAudioResources]);
+  }, [bridge, clearTimer, releaseAudioResources]);
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
