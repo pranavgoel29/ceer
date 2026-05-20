@@ -43,6 +43,9 @@ export function ControlWidgetPage() {
     document.body.classList.add("control-widget-root");
 
     const bridge = getControlWidgetBridge();
+    if (bridge) {
+      setState(bridge.getRecorderState());
+    }
     const unsubscribe = bridge?.onRecorderState((next: RecorderRemoteState) => {
       setState(next);
     });

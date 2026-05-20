@@ -110,6 +110,7 @@ export interface AreaPickerBridge {
 }
 
 export interface ControlWidgetBridge {
+  readonly getRecorderState: () => RecorderRemoteState;
   readonly onRecorderState: (listener: (state: RecorderRemoteState) => void) => () => void;
   readonly sendRecorderCommand: (command: RecorderRemoteCommand) => void;
 }

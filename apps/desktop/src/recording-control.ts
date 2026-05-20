@@ -95,14 +95,29 @@ function resolveControlWidgetPreloadPath(): string {
   return path.join(__dirname, "control-widget-preload.cjs");
 }
 
+function pushRecorderStateTo(window: BrowserWindow): void {
+  if (!window.isDestroyed()) {
+    window.webContents.send(IpcChannels.RECORDER_STATE_CHANNEL, remoteState);
+  }
+}
+
 function broadcastRecorderState(): void {
   const windows = BrowserWindow.getAllWindows();
   for (const window of windows) {
-    if (!window.isDestroyed()) {
-      window.webContents.send(IpcChannels.RECORDER_STATE_CHANNEL, remoteState);
-    }
+    pushRecorderStateTo(window);
   }
   void refreshTrayMenu();
+}
+
+function attachHudStateSync(window: BrowserWindow): void {
+  const push = () => {
+    pushRecorderStateTo(window);
+  };
+
+  window.webContents.on("did-finish-load", push);
+  if (!window.webContents.isLoading()) {
+    push();
+  }
 }
 
 function formatElapsed(ms: number): string {
@@ -362,10 +377,12 @@ function createControlWidgetWindow(): BrowserWindow {
   });
 
   configureFloatingHud(window);
+  attachHudStateSync(window);
   loadControlWidgetPage(window);
 
   window.once("ready-to-show", () => {
     showFloatingHud(window);
+    pushRecorderStateTo(window);
   });
 
   return window;
@@ -389,6 +406,7 @@ function showFloatingHud(window: BrowserWindow): void {
   configureFloatingHud(window);
   positionControlWidget(window);
   window.showInactive();
+  pushRecorderStateTo(window);
 }
 
 function isCaptureSessionPhase(phase: RecorderRemoteState["phase"]): boolean {
@@ -518,6 +536,10 @@ function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemo
 
 export function registerRecordingControl(deps: RecordingControlDeps): void {
   recordingControlDeps = deps;
+
+  ipcMain.on(IpcChannels.RECORDER_STATE_GET_CHANNEL, (event) => {
+    event.returnValue = remoteState;
+  });
 
   ipcMain.on(IpcChannels.RECORDER_STATE_PUBLISH_CHANNEL, (_event, state: RecorderRemoteState) => {
     const previousPhase = remoteState.phase;
