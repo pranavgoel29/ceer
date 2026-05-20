@@ -6,6 +6,7 @@ dist-electron
 release
 dist-out
 dist-release
+.dev-electron.pid
 .electron-runtime
 *.log
 .DS_Store

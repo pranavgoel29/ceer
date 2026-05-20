@@ -5,8 +5,6 @@ const shared = {
   outDir: "dist-electron",
   sourcemap: true,
   outExtensions: () => ({ js: ".cjs" }),
-  // Turbo writes logs under .turbo/ during `dist:mac`; ignore so watch mode does not rebuild.
-  ignoreWatch: [".turbo/**"],
   deps: {
     // Must stay external — bundling inlines getElectronPath() and breaks at runtime.
     neverBundle: ["electron"],

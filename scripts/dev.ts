@@ -1,3 +1,12 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { runChildren } from "./lib/run-children.ts";
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const webDir = join(repoRoot, "apps/web");
+const desktopDir = join(repoRoot, "apps/desktop");
+
 const port = process.env.PORT ?? "5173";
 const host = process.env.HOST?.trim() || "localhost";
 
@@ -6,24 +15,43 @@ process.env.HOST = host;
 process.env.VITE_DEV_SERVER_URL = `http://${host}:${port}`;
 
 const mode = process.argv[2];
-const filters =
-  mode === "desktop"
-    ? ["--filter=@ceer/desktop", "--filter=@ceer/web"]
-    : ["--filter=@ceer/web", "--filter=@ceer/desktop"];
-
 const bun = Bun.which("bun");
 if (!bun) {
   throw new Error("Could not find bun on PATH.");
 }
 
-const child = Bun.spawn({
-  cmd: [bun, "x", "turbo", "run", "dev", ...filters],
-  cwd: import.meta.dirname + "/..",
+const spawnDefaults = {
   env: process.env,
-  stdin: "inherit",
-  stdout: "inherit",
-  stderr: "inherit",
-});
+  stdin: "inherit" as const,
+  stdout: "inherit" as const,
+  stderr: "inherit" as const,
+};
 
-const exitCode = await child.exited;
-process.exit(exitCode);
+const children =
+  mode === "web"
+    ? [
+        Bun.spawn({
+          cmd: [bun, "run", "dev"],
+          cwd: webDir,
+          ...spawnDefaults,
+        }),
+      ]
+    : [
+        Bun.spawn({
+          cmd: [bun, "run", "dev"],
+          cwd: webDir,
+          ...spawnDefaults,
+        }),
+        Bun.spawn({
+          cmd: [bun, "x", "tsdown", "--watch"],
+          cwd: desktopDir,
+          ...spawnDefaults,
+        }),
+        Bun.spawn({
+          cmd: [bun, "run", "dev:electron"],
+          cwd: desktopDir,
+          ...spawnDefaults,
+        }),
+      ];
+
+await runChildren(children);

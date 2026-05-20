@@ -7,17 +7,15 @@
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "bun scripts/dev.ts",
     "dev:bundle": "tsdown --watch",
     "dev:electron": "bun scripts/dev-electron.ts",
-    "dev:kill": "bun scripts/kill-dev-electron.ts",
+    "stop": "bun scripts/stop.ts",
     "build": "tsdown",
     "dist:prepare": "bun scripts/prepare-dist.ts",
-    "dist:unlock": "bun scripts/prepare-dist.ts",
     "dist": "bun run dist:prepare && electron-builder",
     "dist:mac": "bun run dist:prepare && electron-builder --mac",
     "dist:win": "bun run dist:prepare && electron-builder --win",
-    "start": "bun scripts/start-electron.ts",
+    "start": "bun scripts/run-electron.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

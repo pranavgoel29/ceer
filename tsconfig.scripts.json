@@ -4,5 +4,5 @@
     "lib": ["ESNext"],
     "types": ["bun-types", "node"]
   },
-  "include": ["scripts/**/*.ts", "apps/desktop/scripts/**/*.ts"]
+  "include": ["scripts/**/*.ts", "apps/desktop/scripts/**/*.ts", "apps/desktop/scripts/lib/**/*.ts"]
 }

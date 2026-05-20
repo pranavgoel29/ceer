@@ -166,7 +166,7 @@ bun install
 bun run dev
 ```
 
-Starts:
+[`scripts/dev.ts`](scripts/dev.ts) starts in parallel:
 
 1. Vite (`@ceer/web`) on `http://localhost:5173`
 2. `tsdown --watch` for Electron main, preload, and area-picker preload
@@ -186,7 +186,7 @@ bun run dev:web
 
 Open `http://localhost:5173`, share a target, then record and export.
 
-**Desktop-scoped dev** (same as `bun run dev`, filtered packages):
+**Desktop dev** (same processes as `bun run dev`):
 
 ```bash
 bun run dev:desktop
@@ -195,10 +195,10 @@ bun run dev:desktop
 ### Stuck or multiple dock icons?
 
 ```bash
-bun run dev:kill
+bun run stop
 ```
 
-Then `bun run dev` again. Only one Electron instance should run.
+Then `bun run dev` again. On Windows, dev Electron is stopped via `.dev-electron.pid`; packaged builds use `Ceer.exe`.
 
 ### Electron failed to install correctly
 
@@ -263,7 +263,7 @@ cd apps/desktop
 bun run dist:win   # or dist:mac
 ```
 
-Quit any **Ceer** window opened from `dist-out/win-unpacked` before rebuilding (`bun run dev:kill`).
+Quit any **Ceer** window opened from `dist-out/win-unpacked` before rebuilding, or run `bun run stop`.
 
 Config: `apps/desktop/electron-builder.yml` (`electronVersion`, `win.target: nsis`, unsigned local builds via `sign: false`). Packaged UI is served from `process.resourcesPath/web/`.
 
@@ -279,6 +279,11 @@ ceer/
 │   │   │   ├── area-picker.ts       # Region overlay window
 │   │   │   ├── resolve-capture-source.ts
 │   │   │   └── resolve-renderer.ts
+│   │   ├── scripts/
+│   │   │   ├── dev-electron.ts      # Dev Electron launcher (wait, watch, restart)
+│   │   │   ├── prepare-dist.ts      # Pre-pack cleanup (win-unpacked)
+│   │   │   ├── run-electron.ts      # Run against built web assets
+│   │   │   └── lib/                 # paths, stop-instances, wait-ready
 │   │   └── resources/               # icon.svg (source) + generated png/icns/ico
 │   └── web/
 │       └── src/
@@ -309,7 +314,9 @@ ceer/
 │               └── export-recording.ts
 ├── packages/contracts/              # IPC + capture types
 ├── scripts/
-│   ├── dev.ts
-│   └── ensure-electron.ts
+│   ├── dev.ts                       # Dev orchestrator (web + desktop)
+│   ├── lib/run-children.ts
+│   ├── ensure-electron.ts
+│   └── generate-icons.ts
 └── package.json
 ```

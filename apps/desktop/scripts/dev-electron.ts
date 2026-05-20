@@ -1,10 +1,10 @@
-import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import * as Timers from "node:timers/promises";
 
-import { desktopDir, resolveElectronPath } from "./electron-launcher.ts";
-import { waitForResources } from "./wait-for-resources.ts";
+import { clearDevElectronPid, writeDevElectronPid } from "./lib/stop-instances.ts";
+import { desktopDir, resolveElectronPath } from "./lib/paths.ts";
+import { waitForResources } from "./lib/wait-ready.ts";
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
 if (!devServerUrl) {
@@ -19,32 +19,20 @@ if (!Number.isInteger(port) || port <= 0) {
 
 const requiredFiles = ["dist-electron/main.cjs", "dist-electron/preload.cjs"];
 const restartWatchFiles = new Set(["main.cjs", "preload.cjs"]);
-const forcedShutdownTimeoutMs = 1_500;
-const forcedKillAfterMs = 400;
+const forcedShutdownTimeoutMs = 1_000;
 const restartDebounceMs = 450;
-const initialBundleQuietMs = 500;
 
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
 let shuttingDown = false;
 let stopping = false;
+let restarting = false;
 let launcherReady = false;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
 let currentApp: ChildProcess | null = null;
-let restartQueue: Promise<void> = Promise.resolve();
-let lastBundleWriteAt = Date.now();
 const expectedExits = new WeakSet<ChildProcess>();
 const watchers: FSWatcher[] = [];
-
-function killOrphanedDevInstances(): void {
-  if (process.platform === "win32") {
-    return;
-  }
-
-  const marker = join(desktopDir, "dist-electron/main.cjs");
-  spawnSync("pkill", ["-f", marker], { stdio: "ignore" });
-}
 
 function signalAppShutdown(app: ChildProcess): void {
   const pid = app.pid;
@@ -100,9 +88,14 @@ function startApp(): void {
   const app = spawn(resolveElectronPath(), ["dist-electron/main.cjs"], spawnOptions);
   currentApp = app;
 
+  if (app.pid) {
+    writeDevElectronPid(app.pid);
+  }
+
   app.once("error", () => {
     if (currentApp === app) {
       currentApp = null;
+      clearDevElectronPid();
     }
     if (!shuttingDown) {
       scheduleRestart();
@@ -112,6 +105,7 @@ function startApp(): void {
   app.once("exit", (code, signal) => {
     if (currentApp === app) {
       currentApp = null;
+      clearDevElectronPid();
     }
 
     const exitedAbnormally = signal !== null || code !== 0;
@@ -130,6 +124,7 @@ async function stopApp(): Promise<void> {
   stopping = true;
   currentApp = null;
   expectedExits.add(app);
+  clearDevElectronPid();
 
   await new Promise<void>((resolve) => {
     let settled = false;
@@ -148,12 +143,6 @@ async function stopApp(): Promise<void> {
     setTimeout(() => {
       if (!settled) {
         signalAppForceKill(app);
-      }
-    }, forcedKillAfterMs).unref();
-
-    setTimeout(() => {
-      if (!settled) {
-        signalAppForceKill(app);
         finish();
       }
     }, forcedShutdownTimeoutMs).unref();
@@ -163,7 +152,7 @@ async function stopApp(): Promise<void> {
 }
 
 function scheduleRestart(): void {
-  if (shuttingDown || !launcherReady) {
+  if (shuttingDown || !launcherReady || restarting) {
     return;
   }
 
@@ -173,15 +162,24 @@ function scheduleRestart(): void {
 
   restartTimer = setTimeout(() => {
     restartTimer = null;
-    restartQueue = restartQueue
-      .catch(() => undefined)
-      .then(async () => {
-        await stopApp();
-        if (!shuttingDown) {
-          startApp();
-        }
-      });
+    void restartApp();
   }, restartDebounceMs);
+}
+
+async function restartApp(): Promise<void> {
+  if (shuttingDown || restarting) {
+    return;
+  }
+
+  restarting = true;
+  try {
+    await stopApp();
+    if (!shuttingDown) {
+      startApp();
+    }
+  } finally {
+    restarting = false;
+  }
 }
 
 function startWatchers(): void {
@@ -190,16 +188,9 @@ function startWatchers(): void {
       return;
     }
 
-    lastBundleWriteAt = Date.now();
     scheduleRestart();
   });
   watchers.push(watcher);
-}
-
-async function waitForInitialBundleQuiet(): Promise<void> {
-  while (Date.now() - lastBundleWriteAt < initialBundleQuietMs) {
-    await Timers.setTimeout(50);
-  }
 }
 
 async function shutdown(exitCode: number): Promise<void> {
@@ -217,13 +208,10 @@ async function shutdown(exitCode: number): Promise<void> {
     watcher.close();
   }
 
-  await restartQueue.catch(() => undefined);
   await stopApp();
-  killOrphanedDevInstances();
+  clearDevElectronPid();
   process.exit(exitCode);
 }
-
-killOrphanedDevInstances();
 
 await waitForResources({
   baseDir: desktopDir,
@@ -232,8 +220,6 @@ await waitForResources({
   tcpPort: port,
 });
 
-lastBundleWriteAt = Date.now();
-await waitForInitialBundleQuiet();
 startWatchers();
 launcherReady = true;
 startApp();
