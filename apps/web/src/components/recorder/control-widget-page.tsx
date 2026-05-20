@@ -65,6 +65,10 @@ export function ControlWidgetPage() {
     getControlWidgetBridge()?.sendRecorderCommand(command);
   };
 
+  const stopActivate = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+  };
+
   return (
     <div
       className={cn(
@@ -80,7 +84,10 @@ export function ControlWidgetPage() {
         <p className="text-[10px] text-muted-foreground">{statusText}</p>
       </div>
 
-      <div className="ceer-control-widget-no-drag flex shrink-0 gap-1.5">
+      <div
+        className="ceer-control-widget-no-drag flex shrink-0 gap-1.5"
+        onPointerDown={stopActivate}
+      >
         <Button
           type="button"
           variant="ghost"

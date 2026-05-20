@@ -407,9 +407,7 @@ function createControlWidgetWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 272,
     height: 88,
-    ...(process.platform === "darwin"
-      ? { type: "panel" as const, acceptFirstMouse: true }
-      : {}),
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
     frame: false,
     transparent: true,
     resizable: false,
@@ -564,12 +562,16 @@ function syncControlWidgetVisibility(): void {
 
 function hideMainForCaptureSession(): void {
   const main = recordingControlDeps?.getMainWindow();
-  if (!main || main.isDestroyed() || !main.isVisible()) {
+  if (!main || main.isDestroyed()) {
+    return;
+  }
+
+  mainHiddenForCaptureSession = true;
+  if (!main.isVisible()) {
     return;
   }
 
   main.hide();
-  mainHiddenForCaptureSession = true;
 }
 
 function showMainAfterCaptureSession(focus = true): void {
@@ -726,16 +728,27 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
   }
 }
 
-/** macOS `activate` — avoid pulling focus to the main window when only the HUD is active. */
+function isControlHudVisible(): boolean {
+  return (
+    controlBarShown &&
+    controlWidgetWindow !== null &&
+    !controlWidgetWindow.isDestroyed()
+  );
+}
+
+/** macOS `activate` — only raise the main window when the user explicitly asks (dock/tray), not HUD clicks. */
 export function handleAppActivate(): void {
   const main = recordingControlDeps?.getMainWindow();
   if (!main || main.isDestroyed()) {
     return;
   }
 
-  const recordingActive = isRecordingPhase(remoteState.phase);
+  if (isRecordingPhase(remoteState.phase)) {
+    syncControlWidgetVisibility();
+    return;
+  }
 
-  if (recordingActive && mainHiddenForCaptureSession) {
+  if (remoteState.phase === "armed" && isControlHudVisible()) {
     syncControlWidgetVisibility();
     return;
   }
@@ -744,18 +757,8 @@ export function handleAppActivate(): void {
     if (main.isMinimized()) {
       main.restore();
     }
-    if (recordingActive) {
-      main.showInactive();
-      syncControlWidgetVisibility();
-      return;
-    }
     main.show();
     main.focus();
-    return;
-  }
-
-  if (recordingActive) {
-    syncControlWidgetVisibility();
     return;
   }
 
