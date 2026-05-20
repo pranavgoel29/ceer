@@ -37,6 +37,7 @@ let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
 let mainHiddenForCaptureSession = false;
+let controlBarShown = false;
 let appIsActive = true;
 
 let recordingControlDeps: RecordingControlDeps | null = null;
@@ -101,12 +102,31 @@ function pushRecorderStateTo(window: BrowserWindow): void {
   }
 }
 
-function broadcastRecorderState(): void {
-  const windows = BrowserWindow.getAllWindows();
-  for (const window of windows) {
+function pushRecorderStateToAllWindows(): void {
+  for (const window of BrowserWindow.getAllWindows()) {
     pushRecorderStateTo(window);
   }
-  void refreshTrayMenu();
+}
+
+let trayMenuRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleTrayMenuRefresh(): void {
+  if (trayMenuRefreshTimer !== null) {
+    return;
+  }
+  trayMenuRefreshTimer = setTimeout(() => {
+    trayMenuRefreshTimer = null;
+    void refreshTrayMenu();
+  }, 1000);
+}
+
+function broadcastRecorderState(options?: { refreshTray?: boolean }): void {
+  pushRecorderStateToAllWindows();
+  if (options?.refreshTray) {
+    void refreshTrayMenu();
+  } else if (isRecordingPhase(remoteState.phase)) {
+    scheduleTrayMenuRefresh();
+  }
 }
 
 function attachHudStateSync(window: BrowserWindow): void {
@@ -244,8 +264,8 @@ async function refreshTrayMenu(): Promise<void> {
       click: () => sendRecorderCommand(isRecording ? "stop" : "start"),
     },
     {
-      label: controlWidgetWindow?.isVisible() ? "Hide control bar" : "Show control bar",
-      enabled: remoteState.phase === "armed" || isRecording,
+      label: isControlBarMenuVisible() ? "Hide control bar" : "Show control bar",
+      enabled: isRecording,
       click: () => toggleControlWidget(),
     },
     { type: "separator" },
@@ -325,6 +345,16 @@ function showRecordingNotification(body: string): void {
 }
 
 function resolveHudDisplay(): Display {
+  const { armedSourceDisplayId } = remoteState;
+  if (armedSourceDisplayId) {
+    const armedDisplay = screen
+      .getAllDisplays()
+      .find((display) => String(display.id) === armedSourceDisplayId);
+    if (armedDisplay) {
+      return armedDisplay;
+    }
+  }
+
   const main = recordingControlDeps?.getMainWindow();
   if (main && !main.isDestroyed()) {
     return screen.getDisplayMatching(main.getBounds());
@@ -333,13 +363,34 @@ function resolveHudDisplay(): Display {
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 }
 
-function configureFloatingHud(window: BrowserWindow): void {
-  // Keep the HUD on the current Space only — visibleOnAllWorkspaces makes Ceer follow
-  // every Mission Control desktop and often wins focus when dismissing Exposé.
-  if (process.platform === "darwin") {
-    window.setVisibleOnAllWorkspaces(false);
+type HudPresentationMode = "standard" | "recording-overlay";
+
+let hudPresentationMode: HudPresentationMode | null = null;
+
+function applyHudPresentation(window: BrowserWindow, recordingOverlay: boolean): void {
+  const mode: HudPresentationMode = recordingOverlay ? "recording-overlay" : "standard";
+  if (hudPresentationMode === mode) {
+    return;
   }
-  window.setAlwaysOnTop(true, "floating");
+  hudPresentationMode = mode;
+
+  if (process.platform === "darwin") {
+    if (mode === "recording-overlay") {
+      // Required for the HUD to appear above native fullscreen apps on their Space.
+      window.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      window.setAlwaysOnTop(true, "screen-saver");
+      return;
+    }
+
+    window.setVisibleOnAllWorkspaces(false, { skipTransformProcessType: true });
+    window.setAlwaysOnTop(true, "floating");
+    return;
+  }
+
+  window.setAlwaysOnTop(true, mode === "recording-overlay" ? "screen-saver" : "floating");
 }
 
 function loadControlWidgetPage(window: BrowserWindow): void {
@@ -376,12 +427,12 @@ function createControlWidgetWindow(): BrowserWindow {
     },
   });
 
-  configureFloatingHud(window);
+  hudPresentationMode = null;
   attachHudStateSync(window);
   loadControlWidgetPage(window);
 
   window.once("ready-to-show", () => {
-    showFloatingHud(window);
+    syncControlWidgetVisibility();
     pushRecorderStateTo(window);
   });
 
@@ -400,17 +451,37 @@ function positionControlWidget(window: BrowserWindow): void {
 
 function showFloatingHud(window: BrowserWindow): void {
   if (!hudVisiblePreference || window.isDestroyed()) {
+    controlBarShown = false;
     return;
   }
 
-  configureFloatingHud(window);
-  positionControlWidget(window);
-  window.showInactive();
+  const recordingOverlay = isRecordingPhase(remoteState.phase);
+  applyHudPresentation(window, recordingOverlay);
+
+  if (!controlBarShown) {
+    positionControlWidget(window);
+    window.showInactive();
+    controlBarShown = true;
+  } else if (recordingOverlay) {
+    // Re-anchor when the armed display changes mid-session.
+    positionControlWidget(window);
+  }
+
   pushRecorderStateTo(window);
 }
 
-function isCaptureSessionPhase(phase: RecorderRemoteState["phase"]): boolean {
-  return phase === "armed" || phase === "recording" || phase === "stopping";
+function isRecordingPhase(phase: RecorderRemoteState["phase"]): boolean {
+  return phase === "recording" || phase === "stopping";
+}
+
+function isControlBarMenuVisible(): boolean {
+  return (
+    hudVisiblePreference &&
+    isRecordingPhase(remoteState.phase) &&
+    controlBarShown &&
+    controlWidgetWindow !== null &&
+    !controlWidgetWindow.isDestroyed()
+  );
 }
 
 function shouldShowControlWidget(): boolean {
@@ -418,7 +489,7 @@ function shouldShowControlWidget(): boolean {
     return false;
   }
 
-  return hudVisiblePreference && isCaptureSessionPhase(remoteState.phase);
+  return hudVisiblePreference && isRecordingPhase(remoteState.phase);
 }
 
 function canPresentFloatingHud(): boolean {
@@ -426,8 +497,9 @@ function canPresentFloatingHud(): boolean {
     return false;
   }
 
-  // Do not raise the HUD while another app is frontmost (Mission Control / Space switch).
-  if (process.platform === "darwin" && !appIsActive) {
+  // While recording, keep the HUD up over other apps. Only block the initial show when
+  // Ceer is inactive (e.g. Mission Control) so we do not steal focus on space switch.
+  if (process.platform === "darwin" && !appIsActive && !controlBarShown) {
     return false;
   }
 
@@ -438,6 +510,7 @@ export function setAreaPickerActive(active: boolean): void {
   areaPickerActive = active;
   if (active && controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
     controlWidgetWindow.hide();
+    controlBarShown = false;
   }
   syncControlWidgetVisibility();
 }
@@ -446,14 +519,19 @@ function syncControlWidgetVisibility(): void {
   if (canPresentFloatingHud()) {
     if (!controlWidgetWindow || controlWidgetWindow.isDestroyed()) {
       controlWidgetWindow = createControlWidgetWindow();
-    } else if (!controlWidgetWindow.isVisible()) {
+    } else {
       showFloatingHud(controlWidgetWindow);
     }
     return;
   }
 
-  if (controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
+  if (controlBarShown && controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
     controlWidgetWindow.hide();
+    controlBarShown = false;
+  }
+
+  if (controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
+    applyHudPresentation(controlWidgetWindow, false);
   }
 }
 
@@ -492,6 +570,7 @@ function hideControlWidget(): void {
   if (controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
     controlWidgetWindow.hide();
   }
+  controlBarShown = false;
   void refreshTrayMenu();
 }
 
@@ -502,7 +581,7 @@ function toggleControlWidget(): void {
     return;
   }
 
-  if (controlWidgetWindow.isVisible()) {
+  if (isControlBarMenuVisible()) {
     hideControlWidget();
   } else {
     hudVisiblePreference = true;
@@ -512,33 +591,43 @@ function toggleControlWidget(): void {
   void refreshTrayMenu();
 }
 
+function recorderStateAffectsHudVisibility(
+  next: RecorderRemoteState,
+  previousPhase: RecorderRemoteState["phase"],
+): boolean {
+  return next.phase !== previousPhase;
+}
+
 function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemoteState["phase"]): void {
   remoteState = next;
 
-  const isRecording = next.phase === "recording" || next.phase === "stopping";
-  const nextSession = isCaptureSessionPhase(next.phase);
-  const previousSession = isCaptureSessionPhase(previousPhase);
+  const isRecording = isRecordingPhase(next.phase);
+  const previousRecording = isRecordingPhase(previousPhase);
+  const hudVisibilityChanged = recorderStateAffectsHudVisibility(next, previousPhase);
   setPowerSaveBlocker(isRecording);
 
-  if (nextSession && !previousSession) {
+  if (isRecording && !previousRecording) {
     hideMainForCaptureSession();
   }
 
-  if (!nextSession && previousSession && next.phase === "idle") {
-    showMainAfterCaptureSession(false);
+  if (!isRecording && previousRecording) {
+    if (next.phase === "stopped") {
+      showRecordingNotification("Recording ready — export or discard in Ceer.");
+      showMainAfterCaptureSession(true);
+    } else {
+      showMainAfterCaptureSession(false);
+    }
   }
 
   if (next.phase === "recording" && previousPhase !== "recording") {
     showRecordingNotification("Recording… Click to open Ceer.");
   }
 
-  if (next.phase === "stopped" && (previousPhase === "recording" || previousPhase === "stopping")) {
-    showRecordingNotification("Recording ready — export or discard in Ceer.");
-    showMainAfterCaptureSession(true);
+  if (hudVisibilityChanged) {
+    syncControlWidgetVisibility();
   }
 
-  syncControlWidgetVisibility();
-  broadcastRecorderState();
+  broadcastRecorderState({ refreshTray: hudVisibilityChanged });
 }
 
 export function registerRecordingControl(deps: RecordingControlDeps): void {
@@ -589,8 +678,9 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
   if (process.platform === "darwin") {
     app.on("did-resign-active", () => {
       appIsActive = false;
-      if (controlWidgetWindow && !controlWidgetWindow.isDestroyed() && controlWidgetWindow.isVisible()) {
-        controlWidgetWindow.hide();
+      // Keep the HUD visible while recording so elapsed updates do not fight hide/show.
+      if (!isRecordingPhase(remoteState.phase)) {
+        syncControlWidgetVisibility();
       }
     });
 
@@ -608,9 +698,9 @@ export function handleAppActivate(): void {
     return;
   }
 
-  const captureSession = isCaptureSessionPhase(remoteState.phase);
+  const recordingActive = isRecordingPhase(remoteState.phase);
 
-  if (captureSession && mainHiddenForCaptureSession) {
+  if (recordingActive && mainHiddenForCaptureSession) {
     syncControlWidgetVisibility();
     return;
   }
@@ -619,7 +709,7 @@ export function handleAppActivate(): void {
     if (main.isMinimized()) {
       main.restore();
     }
-    if (captureSession) {
+    if (recordingActive) {
       main.showInactive();
       syncControlWidgetVisibility();
       return;
@@ -629,7 +719,7 @@ export function handleAppActivate(): void {
     return;
   }
 
-  if (captureSession) {
+  if (recordingActive) {
     syncControlWidgetVisibility();
     return;
   }

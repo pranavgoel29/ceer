@@ -266,7 +266,9 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       stopStreamTracks(displayStreamRef.current);
       displayStreamRef.current = null;
       releasePreviewOutput();
-      setPhase("idle");
+      if (phaseRef.current !== "armed") {
+        setPhase("idle");
+      }
       setPreviewLoadingMessage(pickQuip(loadingQuips));
       setPreviewLoading(true);
 
