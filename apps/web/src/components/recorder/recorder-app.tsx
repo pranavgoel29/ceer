@@ -1,20 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { CaptureSourceRef } from "@ceer/contracts";
-import { BrowserGate } from "~/components/recorder/browser-gate";
-import { RecordControls } from "~/components/recorder/record-controls";
-import { RecordStage } from "~/components/recorder/record-stage";
-import { RecorderHeader } from "~/components/recorder/recorder-header";
+import { RecorderPlatformProvider } from "~/components/recorder/recorder-platform-context";
+import { RecorderShell } from "~/components/recorder/recorder-shell";
 import { SourcePicker } from "~/components/recorder/source-picker";
+import { WebCapturePanel } from "~/components/recorder/web-capture-panel";
 import { findMatchingSource, toCaptureSourceRef } from "~/lib/capture-source";
+import { getCapturePlatform } from "~/lib/capture-platform";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import { useDesktopRecorder } from "~/hooks/use-desktop-recorder";
+import { useWebRecorder } from "~/hooks/use-web-recorder";
 import { useDesktopSources } from "~/hooks/use-desktop-sources";
-import { useScreenRecorder } from "~/hooks/use-screen-recorder";
 
 export function RecorderApp() {
   const bridge = useDesktopBridge();
+  const platform = getCapturePlatform(bridge !== null);
+
+  return (
+    <RecorderPlatformProvider platform={platform}>
+      {platform === "desktop" ? <DesktopRecorderContent /> : <WebRecorderContent />}
+    </RecorderPlatformProvider>
+  );
+}
+
+function DesktopRecorderContent() {
+  const bridge = useDesktopBridge();
   const { sources, loading, error, refresh } = useDesktopSources();
-  const recorder = useScreenRecorder();
+  const recorder = useDesktopRecorder();
 
   const [selectedSource, setSelectedSource] = useState<CaptureSourceRef | null>(null);
   const [areaSourceId, setAreaSourceId] = useState<string | null>(null);
@@ -31,11 +43,7 @@ export function RecorderApp() {
     }
 
     const match = findMatchingSource(sources, selectedSource);
-    if (!match) {
-      return;
-    }
-
-    if (match.id === selectedSource.id) {
+    if (!match || match.id === selectedSource.id) {
       return;
     }
 
@@ -59,7 +67,7 @@ export function RecorderApp() {
   }, [refresh]);
 
   const handleSelectSource = (sourceId: string) => {
-    if (recorder.phase === "recording") {
+    if (recorder.phase === "recording" || recorder.phase === "stopping") {
       return;
     }
 
@@ -76,7 +84,7 @@ export function RecorderApp() {
   };
 
   const handlePickArea = async (sourceId: string) => {
-    if (!bridge || recorder.phase === "recording") {
+    if (!bridge || recorder.phase === "recording" || recorder.phase === "stopping") {
       return;
     }
 
@@ -104,18 +112,34 @@ export function RecorderApp() {
   };
 
   const rearmIfPossible = () => {
-    if (!selectedSource || recorder.phase !== "armed") {
+    if (recorder.phase !== "armed" || !selectedSource) {
       return;
     }
     void recorder.armPreview(selectedSource);
   };
 
   const handleMicChange = (enabled: boolean) => {
+    if (
+      recorder.phase === "recording" ||
+      recorder.phase === "stopping" ||
+      recorder.previewLoading ||
+      recorder.audioMixing
+    ) {
+      return;
+    }
     recorder.setMicEnabled(enabled);
     rearmIfPossible();
   };
 
   const handleSystemAudioChange = (enabled: boolean) => {
+    if (
+      recorder.phase === "recording" ||
+      recorder.phase === "stopping" ||
+      recorder.previewLoading ||
+      recorder.audioMixing
+    ) {
+      return;
+    }
     recorder.setSystemAudioEnabled(enabled);
     rearmIfPossible();
   };
@@ -124,93 +148,68 @@ export function RecorderApp() {
     recorder.discardRecording();
     setSelectedSource(null);
     setAreaSourceId(null);
-    bridge?.setCaptureSource(null);
+    recorder.resetPreview();
   };
 
-  const canRecord = recorder.phase === "armed";
-  const pickerDisabled = recorder.phase === "recording";
-
-  const combinedError = useMemo(
-    () => error ?? recorder.error,
-    [error, recorder.error],
-  );
+  const pickerDisabled =
+    recorder.phase === "recording" || recorder.phase === "stopping";
 
   return (
-    <div className="ceer-shell ceer-grain relative overflow-x-hidden">
-      <div className="ceer-orb ceer-orb-a" aria-hidden />
-      <div className="ceer-orb ceer-orb-b" aria-hidden />
+    <RecorderShell
+      recorder={recorder}
+      sourcesError={error}
+      onDiscard={handleDiscard}
+      onMicChange={handleMicChange}
+      onSystemAudioChange={handleSystemAudioChange}
+      sidebar={
+        <SourcePicker
+          sources={sources}
+          loading={loading}
+          error={error}
+          selectedId={selectedSource?.id ?? null}
+          areaSourceId={areaSourceId}
+          pickingArea={pickingArea}
+          disabled={pickerDisabled}
+          onRefresh={() => void refresh()}
+          onSelect={handleSelectSource}
+          onPickArea={(sourceId) => void handlePickArea(sourceId)}
+        />
+      }
+    />
+  );
+}
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:gap-6">
-        <RecorderHeader phase={recorder.phase} />
+function WebRecorderContent() {
+  const recorder = useWebRecorder();
 
-        <div className="ceer-stagger flex flex-col gap-4 lg:gap-5">
-          {combinedError ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
-            >
-              {combinedError}
-            </p>
-          ) : null}
+  const handleWebShare = () => {
+    if (recorder.phase === "recording" || recorder.phase === "stopping") {
+      return;
+    }
+    recorder.discardRecording();
+    void recorder.share();
+  };
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5 xl:gap-6">
-            <aside className="order-2 lg:order-1 lg:col-span-4 xl:col-span-3">
-              <div className="lg:sticky lg:top-5">
-                <SourcePicker
-                  sources={sources}
-                  loading={loading}
-                  error={error}
-                  selectedId={selectedSource?.id ?? null}
-                  areaSourceId={areaSourceId}
-                  pickingArea={pickingArea}
-                  disabled={pickerDisabled}
-                  onRefresh={() => void refresh()}
-                  onSelect={handleSelectSource}
-                  onPickArea={(sourceId) => void handlePickArea(sourceId)}
-                />
-              </div>
-            </aside>
+  const pickerDisabled =
+    recorder.phase === "recording" || recorder.phase === "stopping";
 
-            <main className="order-1 min-w-0 lg:order-2 lg:col-span-5 xl:col-span-6">
-              <RecordStage
-                phase={recorder.phase}
-                previewLoading={recorder.previewLoading}
-                loadingMessage={recorder.previewLoadingMessage}
-                previewStream={recorder.previewStream}
-                recordingUrl={recorder.recording?.url ?? null}
-                elapsedMs={recorder.elapsedMs}
-                captureRegion={recorder.captureRegion}
-              />
-            </main>
-
-            <aside className="order-3 lg:col-span-3 xl:col-span-3">
-              <div className="lg:sticky lg:top-5">
-                <RecordControls
-                  phase={recorder.phase}
-                  micEnabled={recorder.micEnabled}
-                  systemAudioEnabled={recorder.systemAudioEnabled}
-                  recording={recorder.recording}
-                  canRecord={canRecord}
-                  onMicChange={handleMicChange}
-                  onSystemAudioChange={handleSystemAudioChange}
-                  onStart={recorder.startRecording}
-                  onStop={recorder.stopRecording}
-                  onDiscard={handleDiscard}
-                />
-              </div>
-            </aside>
-          </div>
-        </div>
-      </div>
-    </div>
+  return (
+    <RecorderShell
+      recorder={recorder}
+      sidebar={
+        <WebCapturePanel
+          phase={recorder.phase}
+          previewLoading={recorder.previewLoading}
+          shareLabel={recorder.webShareLabel}
+          disabled={pickerDisabled}
+          onShare={handleWebShare}
+          onChangeShare={handleWebShare}
+        />
+      }
+    />
   );
 }
 
 export function RecorderRoot() {
-  const bridge = useDesktopBridge();
-  if (!bridge) {
-    return <BrowserGate />;
-  }
-
   return <RecorderApp />;
 }

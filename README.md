@@ -21,7 +21,8 @@
 
 - **System audio** on macOS requires **macOS 13+** and **Screen Recording** permission; loopback is most reliable for **screen** capture (window-only capture may have no audio).
 - **Microphone** uses the browser `getUserMedia` path; grant mic access in System Settings when prompted.
-- The web UI loads in a normal browser for layout checks, but **recording requires the Electron app** (desktop bridge).
+- **Browser mode** (`bun run dev:web`) — record via the browser share picker; mic + export work; no source grid, area crop, or macOS loopback.
+- **Desktop mode** (`bun run dev`) — full feature set via the Electron shell.
 
 ## Stack
 
@@ -61,11 +62,13 @@ Override the host or port:
 PORT=5174 HOST=127.0.0.1 bun run dev
 ```
 
-Run only the web UI in a browser (no recording):
+Run the web UI in a browser (screen capture via the browser picker — use **Chrome** or **Edge** for best results):
 
 ```bash
 bun run dev:web
 ```
+
+Open `http://localhost:5173`, click **Share screen or window**, allow permissions, then record and export. Requires `localhost` or `https://` (secure context).
 
 Desktop-only dev (same as `bun run dev` but scoped to desktop + web packages):
 

@@ -4,9 +4,11 @@ import { useEffect, useRef } from "react";
 import type { CaptureRegion } from "@ceer/contracts";
 import { Badge } from "~/components/ui/badge";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
-import type { RecorderPhase } from "~/hooks/use-screen-recorder";
+import type { RecorderPhase } from "~/hooks/recorder-types";
 import { formatDuration } from "~/lib/format";
+import { sharePanelDescription } from "~/lib/capture-platform";
 import { cn } from "~/lib/utils";
+import { useIsWebRecorder } from "~/components/recorder/recorder-platform-context";
 
 interface RecordStageProps {
   readonly phase: RecorderPhase;
@@ -36,6 +38,8 @@ function phaseBadgeLabel(
       return "Live preview";
     case "recording":
       return "On air";
+    case "stopping":
+      return "Finishing";
     case "stopped":
       return "Playback";
     default:
@@ -53,6 +57,7 @@ export function RecordStage({
   captureRegion,
 }: RecordStageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isWeb = useIsWebRecorder();
 
   useEffect(() => {
     const node = videoRef.current;
@@ -69,7 +74,8 @@ export function RecordStage({
     node.srcObject = null;
   }, [previewStream]);
 
-  const isLive = phase === "armed" || phase === "recording";
+  const isLive =
+    phase === "armed" || phase === "recording" || phase === "stopping";
   const showPlayback = phase === "stopped" && recordingUrl;
 
   return (
@@ -124,7 +130,9 @@ export function RecordStage({
             <div className="max-w-xs space-y-1">
               <p className="text-sm font-medium">No signal yet</p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Select a screen or window on the left, or snip a custom region.
+                {isWeb
+                  ? sharePanelDescription()
+                  : "Select a screen or window on the left, or snip a custom region."}
               </p>
             </div>
           </div>

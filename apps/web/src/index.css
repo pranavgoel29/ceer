@@ -201,6 +201,27 @@
     animation: ceer-blink 1s steps(2, end) infinite;
   }
 
+  progress.export-progress {
+    appearance: none;
+    border: none;
+    background-color: var(--muted);
+  }
+
+  progress.export-progress::-webkit-progress-bar {
+    background-color: var(--muted);
+    border-radius: 9999px;
+  }
+
+  progress.export-progress::-webkit-progress-value {
+    background-color: var(--ceer-lime);
+    border-radius: 9999px;
+  }
+
+  progress.export-progress::-moz-progress-bar {
+    background-color: var(--ceer-lime);
+    border-radius: 9999px;
+  }
+
   .ceer-shell {
     position: relative;
     min-height: 100svh;
