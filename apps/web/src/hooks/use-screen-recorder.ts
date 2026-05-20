@@ -45,8 +45,20 @@ export function useScreenRecorder() {
   const [recording, setRecording] = useState<RecordingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
+  const [micEnabled, setMicEnabledState] = useState(true);
+  const [systemAudioEnabled, setSystemAudioEnabledState] = useState(true);
+  const micEnabledRef = useRef(true);
+  const systemAudioEnabledRef = useRef(true);
+
+  const setMicEnabled = useCallback((enabled: boolean) => {
+    micEnabledRef.current = enabled;
+    setMicEnabledState(enabled);
+  }, []);
+
+  const setSystemAudioEnabled = useCallback((enabled: boolean) => {
+    systemAudioEnabledRef.current = enabled;
+    setSystemAudioEnabledState(enabled);
+  }, []);
   const [armedSourceId, setArmedSourceId] = useState<string | null>(null);
   const [captureRegion, setCaptureRegion] = useState<CaptureRegion | null>(null);
   const [captureDisplay, setCaptureDisplay] = useState<DisplayBounds | null>(null);
@@ -126,13 +138,14 @@ export function useScreenRecorder() {
       setPreviewLoadingMessage(pickQuip(loadingQuips));
       setPreviewLoading(true);
 
-      bridge.setCapturePreferences({ systemAudioEnabled });
+      const wantsSystemAudio = systemAudioEnabledRef.current;
+      bridge.setCapturePreferences({ systemAudioEnabled: wantsSystemAudio });
       bridge.setCaptureSource(source);
 
       try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: systemAudioEnabled,
+          audio: wantsSystemAudio,
         });
 
         const audioStreams: MediaStream[] = [];
@@ -140,13 +153,13 @@ export function useScreenRecorder() {
 
         if (systemTracks.length > 0) {
           audioStreams.push(new MediaStream(systemTracks));
-        } else if (systemAudioEnabled) {
+        } else if (wantsSystemAudio) {
           setError(
             "System audio unavailable. On macOS you need 13+ and Screen Recording permission; window-only capture may have no audio.",
           );
         }
 
-        if (micEnabled) {
+        if (micEnabledRef.current) {
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
               audio: {
@@ -154,8 +167,12 @@ export function useScreenRecorder() {
                 noiseSuppression: true,
               },
             });
-            micStreamsRef.current.push(micStream);
-            audioStreams.push(micStream);
+            if (armGenerationRef.current !== armGeneration || !micEnabledRef.current) {
+              stopStream(micStream);
+            } else {
+              micStreamsRef.current.push(micStream);
+              audioStreams.push(micStream);
+            }
           } catch {
             setError((previous) =>
               previous
@@ -217,7 +234,7 @@ export function useScreenRecorder() {
         }
       }
     },
-    [bridge, micEnabled, releaseAudioResources, resetPreview, systemAudioEnabled],
+    [bridge, releaseAudioResources, resetPreview],
   );
 
   const startRecording = useCallback(() => {
