@@ -36,6 +36,8 @@ let controlWidgetWindow: BrowserWindow | null = null;
 let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
+let mainHiddenForCaptureSession = false;
+let appIsActive = true;
 
 let recordingControlDeps: RecordingControlDeps | null = null;
 
@@ -257,6 +259,7 @@ function showMainWindow(): void {
     return;
   }
 
+  mainHiddenForCaptureSession = false;
   if (main.isMinimized()) {
     main.restore();
   }
@@ -321,7 +324,7 @@ function configureFloatingHud(window: BrowserWindow): void {
   if (process.platform === "darwin") {
     window.setVisibleOnAllWorkspaces(false);
   }
-  window.setAlwaysOnTop(true, "screen-saver");
+  window.setAlwaysOnTop(true, "floating");
 }
 
 function loadControlWidgetPage(window: BrowserWindow): void {
@@ -350,7 +353,6 @@ function createControlWidgetWindow(): BrowserWindow {
     hasShadow: true,
     show: false,
     backgroundColor: "#00000000",
-    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
     webPreferences: {
       preload: resolveControlWidgetPreloadPath(),
       contextIsolation: true,
@@ -389,17 +391,29 @@ function showFloatingHud(window: BrowserWindow): void {
   window.showInactive();
 }
 
+function isCaptureSessionPhase(phase: RecorderRemoteState["phase"]): boolean {
+  return phase === "armed" || phase === "recording" || phase === "stopping";
+}
+
 function shouldShowControlWidget(): boolean {
   if (areaPickerActive) {
     return false;
   }
 
-  return (
-    hudVisiblePreference &&
-    (remoteState.phase === "armed" ||
-      remoteState.phase === "recording" ||
-      remoteState.phase === "stopping")
-  );
+  return hudVisiblePreference && isCaptureSessionPhase(remoteState.phase);
+}
+
+function canPresentFloatingHud(): boolean {
+  if (!shouldShowControlWidget()) {
+    return false;
+  }
+
+  // Do not raise the HUD while another app is frontmost (Mission Control / Space switch).
+  if (process.platform === "darwin" && !appIsActive) {
+    return false;
+  }
+
+  return true;
 }
 
 export function setAreaPickerActive(active: boolean): void {
@@ -411,12 +425,10 @@ export function setAreaPickerActive(active: boolean): void {
 }
 
 function syncControlWidgetVisibility(): void {
-  if (shouldShowControlWidget()) {
+  if (canPresentFloatingHud()) {
     if (!controlWidgetWindow || controlWidgetWindow.isDestroyed()) {
       controlWidgetWindow = createControlWidgetWindow();
-    } else if (controlWidgetWindow.isVisible()) {
-      configureFloatingHud(controlWidgetWindow);
-    } else {
+    } else if (!controlWidgetWindow.isVisible()) {
       showFloatingHud(controlWidgetWindow);
     }
     return;
@@ -424,6 +436,36 @@ function syncControlWidgetVisibility(): void {
 
   if (controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
     controlWidgetWindow.hide();
+  }
+}
+
+function hideMainForCaptureSession(): void {
+  const main = recordingControlDeps?.getMainWindow();
+  if (!main || main.isDestroyed() || !main.isVisible()) {
+    return;
+  }
+
+  main.hide();
+  mainHiddenForCaptureSession = true;
+}
+
+function showMainAfterCaptureSession(focus = true): void {
+  const main = recordingControlDeps?.getMainWindow();
+  if (!main || main.isDestroyed()) {
+    return;
+  }
+
+  mainHiddenForCaptureSession = false;
+  if (main.isMinimized()) {
+    main.restore();
+  }
+  if (focus) {
+    showMainWindow();
+    return;
+  }
+
+  if (!main.isVisible()) {
+    main.showInactive();
   }
 }
 
@@ -449,7 +491,17 @@ function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemo
   remoteState = next;
 
   const isRecording = next.phase === "recording" || next.phase === "stopping";
+  const nextSession = isCaptureSessionPhase(next.phase);
+  const previousSession = isCaptureSessionPhase(previousPhase);
   setPowerSaveBlocker(isRecording);
+
+  if (nextSession && !previousSession) {
+    hideMainForCaptureSession();
+  }
+
+  if (!nextSession && previousSession && next.phase === "idle") {
+    showMainAfterCaptureSession(false);
+  }
 
   if (next.phase === "recording" && previousPhase !== "recording") {
     showRecordingNotification("Recording… Click to open Ceer.");
@@ -457,7 +509,7 @@ function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemo
 
   if (next.phase === "stopped" && (previousPhase === "recording" || previousPhase === "stopping")) {
     showRecordingNotification("Recording ready — export or discard in Ceer.");
-    showMainWindow();
+    showMainAfterCaptureSession(true);
   }
 
   syncControlWidgetVisibility();
@@ -499,6 +551,20 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
     });
   }
   void refreshTrayMenu();
+
+  if (process.platform === "darwin") {
+    app.on("did-resign-active", () => {
+      appIsActive = false;
+      if (controlWidgetWindow && !controlWidgetWindow.isDestroyed() && controlWidgetWindow.isVisible()) {
+        controlWidgetWindow.hide();
+      }
+    });
+
+    app.on("did-become-active", () => {
+      appIsActive = true;
+      syncControlWidgetVisibility();
+    });
+  }
 }
 
 /** macOS `activate` — avoid pulling focus to the main window when only the HUD is active. */
@@ -508,23 +574,29 @@ export function handleAppActivate(): void {
     return;
   }
 
+  const captureSession = isCaptureSessionPhase(remoteState.phase);
+
+  if (captureSession && mainHiddenForCaptureSession) {
+    syncControlWidgetVisibility();
+    return;
+  }
+
   if (!main.isVisible()) {
     if (main.isMinimized()) {
       main.restore();
+    }
+    if (captureSession) {
+      main.showInactive();
+      syncControlWidgetVisibility();
+      return;
     }
     main.show();
     main.focus();
     return;
   }
 
-  const hudSession =
-    remoteState.phase === "armed" ||
-    remoteState.phase === "recording" ||
-    remoteState.phase === "stopping";
-  const hudVisible =
-    Boolean(controlWidgetWindow && !controlWidgetWindow.isDestroyed() && controlWidgetWindow.isVisible());
-
-  if (hudSession && hudVisible) {
+  if (captureSession) {
+    syncControlWidgetVisibility();
     return;
   }
 

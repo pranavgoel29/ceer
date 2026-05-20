@@ -4,6 +4,7 @@ import path from "node:path";
 import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
+import { registerDisplayMediaHandler } from "./display-media-handler.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { listDesktopSources } from "./list-desktop-sources.ts";
 import {
@@ -11,7 +12,6 @@ import {
   handleAppActivate,
   registerRecordingControl,
 } from "./recording-control.ts";
-import { resolveCapturerSource } from "./resolve-capture-source.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
@@ -38,30 +38,11 @@ function resolveAppIconPath(): string {
   return path.join(__dirname, "../resources", iconFile);
 }
 
-function registerDisplayMediaHandler(): void {
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    void (async () => {
-      const { desktopCapturer } = await import("electron");
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 1, height: 1 },
-      });
-
-      const picked = resolveCapturerSource(sources, selectedCaptureSource);
-
-      if (!picked) {
-        callback({});
-        return;
-      }
-
-      const wantsSystemAudio = capturePreferences.systemAudioEnabled && request.audioRequested;
-
-      callback({
-        video: picked,
-        ...(wantsSystemAudio ? { audio: "loopback" as const } : {}),
-      });
-    })();
-  });
+function wireDisplayMediaHandler(): void {
+  registerDisplayMediaHandler(session.defaultSession, () => ({
+    selectedCaptureSource,
+    capturePreferences,
+  }));
 }
 
 function createMainWindow(): BrowserWindow {
@@ -165,7 +146,7 @@ if (hasSingleInstanceLock) {
       app.dock.setIcon(resolveAppIconPath());
     }
 
-    registerDisplayMediaHandler();
+    wireDisplayMediaHandler();
     registerIpcHandlers();
     registerAreaPickerHandlers(() => mainWindow);
     registerRecordingControl({
