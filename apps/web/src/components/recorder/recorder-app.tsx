@@ -43,7 +43,7 @@ function DesktopRecorderContent() {
     }
 
     const match = findMatchingSource(sources, selectedSource);
-    if (!match || match.id === selectedSource.id) {
+    if (!match || match.kind !== selectedSource.kind || match.id === selectedSource.id) {
       return;
     }
 
@@ -54,7 +54,18 @@ function DesktopRecorderContent() {
 
   useEffect(() => {
     const onFocus = () => {
-      if (!selectedSourceRef.current) {
+      const current = selectedSourceRef.current;
+      if (!current) {
+        return;
+      }
+      if (
+        recorder.phase === "armed" ||
+        recorder.phase === "recording" ||
+        recorder.phase === "stopping"
+      ) {
+        return;
+      }
+      if (pickingArea) {
         return;
       }
       window.setTimeout(() => {
@@ -64,7 +75,7 @@ function DesktopRecorderContent() {
 
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [refresh]);
+  }, [refresh, recorder.phase, pickingArea]);
 
   const handleSelectSource = (sourceId: string) => {
     if (recorder.phase === "recording" || recorder.phase === "stopping") {
@@ -106,10 +117,12 @@ function DesktopRecorderContent() {
       return;
     }
 
+    const pickedSource = sources.find((item) => item.id === pick.sourceId);
     let captureRef: CaptureSourceRef = {
       id: pick.sourceId,
       name: pick.sourceName,
       kind: pick.sourceKind,
+      ...(pickedSource?.displayId ? { displayId: pickedSource.displayId } : {}),
     };
 
     // Region coordinates are in display space; crop requires a screen capture target.
@@ -175,6 +188,39 @@ function DesktopRecorderContent() {
     setAreaSourceId(null);
     recorder.resetPreview();
   };
+
+  useEffect(() => {
+    if (!bridge) {
+      return;
+    }
+
+    return bridge.onSelectCaptureSource((ref) => {
+      const match =
+        sources.find((item) => item.id === ref.id) ??
+        sources.find((item) => item.name === ref.name && item.kind === ref.kind);
+      if (match) {
+        handleSelectSource(match.id);
+      }
+    });
+  }, [bridge, sources, recorder.phase]);
+
+  useEffect(() => {
+    if (!bridge) {
+      return;
+    }
+
+    return bridge.onRecorderCommand((command) => {
+      if (command === "pick-area") {
+        const targetId =
+          selectedSourceRef.current?.id ??
+          sources.find((item) => item.kind === "screen")?.id ??
+          sources[0]?.id;
+        if (targetId) {
+          void handlePickArea(targetId);
+        }
+      }
+    });
+  }, [bridge, sources, recorder.phase]);
 
   const pickerDisabled =
     recorder.phase === "recording" || recorder.phase === "stopping";

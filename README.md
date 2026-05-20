@@ -29,6 +29,7 @@ Shared everywhere:
 **Desktop (Electron)**
 
 - **System audio** on macOS needs **macOS 13+** and **Screen Recording** permission. Loopback is most reliable for **full screen** capture; window-only capture may have no audio.
+- **Fullscreen apps on macOS** — Electron’s window list usually omits apps on a separate fullscreen Space; record them by choosing the matching **Screen**, not **Windows**.
 - **Microphone** uses `getUserMedia`; grant access in System Settings when prompted.
 - **Area crop** opens a fullscreen overlay (`area-picker`) with a source strip (screens and windows), then drag a region on that display. Region capture uses the matching screen stream; window picks in the overlay help you choose the display.
 - **Menu bar tray** (right-click on macOS) and **floating control bar** — start/stop while hidden; stopping a recording reopens the window for export; close hides to tray instead of quitting.

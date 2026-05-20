@@ -188,7 +188,9 @@ function openPickerWindow(bounds: { x: number; y: number; width: number; height:
     },
   });
 
-  areaPickerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (process.platform === "darwin") {
+    areaPickerWindow.setVisibleOnAllWorkspaces(false);
+  }
   areaPickerWindow.setAlwaysOnTop(true, "screen-saver");
 
   loadAreaPickerPage(areaPickerWindow);

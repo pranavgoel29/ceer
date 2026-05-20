@@ -6,7 +6,11 @@ import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
 import { registerAreaPickerHandlers } from "./area-picker.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { listDesktopSources } from "./list-desktop-sources.ts";
-import { attachMainWindowCloseBehavior, registerRecordingControl } from "./recording-control.ts";
+import {
+  attachMainWindowCloseBehavior,
+  handleAppActivate,
+  registerRecordingControl,
+} from "./recording-control.ts";
 import { resolveCapturerSource } from "./resolve-capture-source.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
@@ -164,16 +168,20 @@ if (hasSingleInstanceLock) {
     registerDisplayMediaHandler();
     registerIpcHandlers();
     registerAreaPickerHandlers(() => mainWindow);
-    registerRecordingControl(() => mainWindow);
+    registerRecordingControl({
+      getMainWindow: () => mainWindow,
+      setCaptureSource: (source) => {
+        selectedCaptureSource = source;
+      },
+    });
     createMainWindow();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createMainWindow();
-      } else if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
+        return;
       }
+      handleAppActivate();
     });
   });
 

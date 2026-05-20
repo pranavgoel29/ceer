@@ -1,4 +1,9 @@
-import type { CaptureSourceRef, DesktopBridge, RecorderRemoteCommand, RecorderRemoteState } from "@ceer/contracts";
+import type {
+  CaptureSourceRef,
+  DesktopBridge,
+  RecorderRemoteCommand,
+  RecorderRemoteState,
+} from "@ceer/contracts";
 import { contextBridge, ipcRenderer } from "electron";
 
 import * as IpcChannels from "./ipc/channels.ts";
@@ -25,6 +30,13 @@ const desktopBridge: DesktopBridge = {
     ipcRenderer.on(IpcChannels.RECORDER_COMMAND_CHANNEL, handler);
     return () => {
       ipcRenderer.removeListener(IpcChannels.RECORDER_COMMAND_CHANNEL, handler);
+    };
+  },
+  onSelectCaptureSource: (listener: (source: CaptureSourceRef) => void) => {
+    const handler = (_event: unknown, source: CaptureSourceRef) => listener(source);
+    ipcRenderer.on(IpcChannels.RECORDER_SELECT_SOURCE_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.RECORDER_SELECT_SOURCE_CHANNEL, handler);
     };
   },
 };

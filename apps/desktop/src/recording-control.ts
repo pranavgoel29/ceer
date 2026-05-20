@@ -13,17 +13,31 @@ import {
 } from "electron";
 import path from "node:path";
 
-import type { RecorderRemoteCommand, RecorderRemoteState } from "@ceer/contracts";
+import {
+  isSameCaptureSource,
+  toCaptureSourceRef,
+  type CaptureSourceRef,
+  type DesktopCaptureSource,
+  type RecorderRemoteCommand,
+  type RecorderRemoteState,
+} from "@ceer/contracts";
 
 import * as IpcChannels from "./ipc/channels.ts";
+import { listDesktopSources } from "./list-desktop-sources.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
+
+export interface RecordingControlDeps {
+  readonly getMainWindow: () => BrowserWindowType | null;
+  readonly setCaptureSource: (source: CaptureSourceRef | null) => void;
+}
 
 let tray: Tray | null = null;
 let controlWidgetWindow: BrowserWindow | null = null;
-let mainWindowRef: (() => BrowserWindowType | null) | null = null;
 let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
+
+let recordingControlDeps: RecordingControlDeps | null = null;
 
 let remoteState: RecorderRemoteState = {
   phase: "idle",
@@ -31,6 +45,9 @@ let remoteState: RecorderRemoteState = {
   canStop: false,
   elapsedMs: 0,
   sourceName: null,
+  armedSourceKind: null,
+  armedSourceDisplayId: null,
+  armedSourceId: null,
 };
 
 function resolveAppIconPath(): string {
@@ -41,14 +58,35 @@ function resolveAppIconPath(): string {
   return path.join(__dirname, "../resources", iconFile);
 }
 
-function createTrayIcon() {
-  const image = nativeImage.createFromPath(resolveAppIconPath());
+function resolveTrayIconPath(): string {
+  const resourcesRoot = app.isPackaged
+    ? process.resourcesPath
+    : path.join(__dirname, "../resources");
+
   if (process.platform === "darwin") {
-    const resized = image.resize({ width: 18, height: 18 });
-    resized.setTemplateImage(true);
-    return resized;
+    const packagedTray = path.join(resourcesRoot, "tray-icon.png");
+    const devTray = path.join(resourcesRoot, "icon.iconset", "icon_16x16@2x.png");
+    return app.isPackaged ? packagedTray : devTray;
   }
-  return image;
+
+  return resolveAppIconPath();
+}
+
+function createTrayIcon() {
+  const image = nativeImage.createFromPath(resolveTrayIconPath());
+  if (image.isEmpty()) {
+    return nativeImage.createFromPath(resolveAppIconPath());
+  }
+
+  if (process.platform === "darwin") {
+    return image.resize({ width: 22, height: 22 });
+  }
+
+  if (process.platform === "win32") {
+    return image.resize({ width: 16, height: 16 });
+  }
+
+  return image.resize({ width: 24, height: 24 });
 }
 
 function resolveControlWidgetPreloadPath(): string {
@@ -62,7 +100,7 @@ function broadcastRecorderState(): void {
       window.webContents.send(IpcChannels.RECORDER_STATE_CHANNEL, remoteState);
     }
   }
-  updateTrayMenu();
+  void refreshTrayMenu();
 }
 
 function formatElapsed(ms: number): string {
@@ -72,16 +110,115 @@ function formatElapsed(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function updateTrayMenu(): void {
+function sendSelectSourceToRenderer(source: CaptureSourceRef): void {
+  const main = recordingControlDeps?.getMainWindow();
+  if (!main || main.isDestroyed()) {
+    return;
+  }
+
+  main.webContents.send(IpcChannels.RECORDER_SELECT_SOURCE_CHANNEL, source);
+}
+
+function selectCaptureSourceFromTray(source: DesktopCaptureSource): void {
+  const ref = toCaptureSourceRef(source);
+
+  recordingControlDeps?.setCaptureSource(ref);
+  sendSelectSourceToRenderer(ref);
+}
+
+function armedSourceRefFromRemoteState(): CaptureSourceRef | null {
+  const { armedSourceId, sourceName, armedSourceKind } = remoteState;
+  if (!armedSourceId && !sourceName) {
+    return null;
+  }
+
+  return {
+    id: armedSourceId ?? "",
+    name: sourceName ?? "",
+    kind: armedSourceKind ?? "screen",
+    ...(remoteState.armedSourceDisplayId ? { displayId: remoteState.armedSourceDisplayId } : {}),
+  };
+}
+
+function buildSourceMenuItems(
+  sources: DesktopCaptureSource[],
+  disabled: boolean,
+): import("electron").MenuItemConstructorOptions[] {
+  if (sources.length === 0) {
+    return [{ label: "No targets found", enabled: false }];
+  }
+
+  const armedRef = armedSourceRefFromRemoteState();
+
+  return sources.map((source) => ({
+    label: source.name,
+    type: "radio" as const,
+    checked: isSameCaptureSource(source, armedRef),
+    enabled: !disabled,
+    click: () => {
+      selectCaptureSourceFromTray(source);
+    },
+  }));
+}
+
+async function refreshTrayMenu(): Promise<void> {
   if (!tray) {
     return;
   }
 
   const isRecording = remoteState.phase === "recording" || remoteState.phase === "stopping";
+  const sourcesDisabled =
+    isRecording || remoteState.phase === "stopping" || areaPickerActive;
+
+  let sources: DesktopCaptureSource[] = [];
+  try {
+    sources = await listDesktopSources();
+  } catch {
+    sources = [];
+  }
+
+  const screens = sources.filter((source) => source.kind === "screen");
+  const windows = sources.filter((source) => source.kind === "window");
+  const defaultScreenId = screens[0]?.id;
+
   const menu = Menu.buildFromTemplate([
     {
       label: "Show Ceer",
       click: () => sendRecorderCommand("show-main"),
+    },
+    { type: "separator" },
+    {
+      label: "Screens",
+      enabled: !areaPickerActive,
+      submenu: buildSourceMenuItems(screens, sourcesDisabled),
+    },
+    {
+      label: "Windows",
+      enabled: !areaPickerActive,
+      submenu: buildSourceMenuItems(windows, sourcesDisabled),
+    },
+    { type: "separator" },
+    {
+      label: "Snip region…",
+      enabled: !sourcesDisabled && Boolean(defaultScreenId),
+      click: () => {
+        const armedRef = armedSourceRefFromRemoteState();
+        const screenSource =
+          (armedRef?.kind === "screen"
+            ? screens.find((item) => isSameCaptureSource(item, armedRef))
+            : undefined) ?? screens[0];
+        if (screenSource) {
+          selectCaptureSourceFromTray(screenSource);
+        }
+        sendRecorderCommand("pick-area");
+      },
+    },
+    {
+      label: "Refresh targets",
+      enabled: !sourcesDisabled,
+      click: () => {
+        void refreshTrayMenu();
+      },
     },
     { type: "separator" },
     {
@@ -105,15 +242,17 @@ function updateTrayMenu(): void {
   ]);
 
   tray.setContextMenu(menu);
+
+  const targetLabel = remoteState.sourceName ? ` — ${remoteState.sourceName}` : "";
   tray.setToolTip(
     isRecording
-      ? `Ceer — Recording ${formatElapsed(remoteState.elapsedMs)}`
-      : "Ceer — Screen recorder",
+      ? `Ceer — Recording ${formatElapsed(remoteState.elapsedMs)}${targetLabel}`
+      : `Ceer — Screen recorder${targetLabel}`,
   );
 }
 
 function showMainWindow(): void {
-  const main = mainWindowRef?.();
+  const main = recordingControlDeps?.getMainWindow();
   if (!main || main.isDestroyed()) {
     return;
   }
@@ -125,8 +264,8 @@ function showMainWindow(): void {
   main.focus();
 }
 
-function sendRecorderCommand(command: RecorderRemoteCommand): void {
-  const main = mainWindowRef?.();
+function sendRecorderCommand(command: "start" | "stop" | "show-main" | "pick-area"): void {
+  const main = recordingControlDeps?.getMainWindow();
   if (!main || main.isDestroyed()) {
     return;
   }
@@ -141,9 +280,7 @@ function sendRecorderCommand(command: RecorderRemoteCommand): void {
 
 function setPowerSaveBlocker(active: boolean): void {
   if (active) {
-    if (powerSaveBlockerId === null) {
-      powerSaveBlockerId = powerSaveBlocker.start("prevent-app-suspension");
-    }
+    powerSaveBlockerId ??= powerSaveBlocker.start("prevent-app-suspension");
     return;
   }
 
@@ -170,7 +307,7 @@ function showRecordingNotification(body: string): void {
 }
 
 function resolveHudDisplay(): Display {
-  const main = mainWindowRef?.();
+  const main = recordingControlDeps?.getMainWindow();
   if (main && !main.isDestroyed()) {
     return screen.getDisplayMatching(main.getBounds());
   }
@@ -179,7 +316,11 @@ function resolveHudDisplay(): Display {
 }
 
 function configureFloatingHud(window: BrowserWindow): void {
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Keep the HUD on the current Space only — visibleOnAllWorkspaces makes Ceer follow
+  // every Mission Control desktop and often wins focus when dismissing Exposé.
+  if (process.platform === "darwin") {
+    window.setVisibleOnAllWorkspaces(false);
+  }
   window.setAlwaysOnTop(true, "screen-saver");
 }
 
@@ -245,7 +386,7 @@ function showFloatingHud(window: BrowserWindow): void {
 
   configureFloatingHud(window);
   positionControlWidget(window);
-  window.show();
+  window.showInactive();
 }
 
 function shouldShowControlWidget(): boolean {
@@ -273,10 +414,10 @@ function syncControlWidgetVisibility(): void {
   if (shouldShowControlWidget()) {
     if (!controlWidgetWindow || controlWidgetWindow.isDestroyed()) {
       controlWidgetWindow = createControlWidgetWindow();
-    } else if (!controlWidgetWindow.isVisible()) {
-      showFloatingHud(controlWidgetWindow);
-    } else {
+    } else if (controlWidgetWindow.isVisible()) {
       configureFloatingHud(controlWidgetWindow);
+    } else {
+      showFloatingHud(controlWidgetWindow);
     }
     return;
   }
@@ -301,7 +442,7 @@ function toggleControlWidget(): void {
     showFloatingHud(controlWidgetWindow);
   }
 
-  updateTrayMenu();
+  void refreshTrayMenu();
 }
 
 function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemoteState["phase"]): void {
@@ -309,15 +450,6 @@ function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemo
 
   const isRecording = next.phase === "recording" || next.phase === "stopping";
   setPowerSaveBlocker(isRecording);
-
-  if (
-    isRecording &&
-    controlWidgetWindow &&
-    !controlWidgetWindow.isDestroyed() &&
-    controlWidgetWindow.isVisible()
-  ) {
-    configureFloatingHud(controlWidgetWindow);
-  }
 
   if (next.phase === "recording" && previousPhase !== "recording") {
     showRecordingNotification("Recording… Click to open Ceer.");
@@ -332,8 +464,8 @@ function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemo
   broadcastRecorderState();
 }
 
-export function registerRecordingControl(getMainWindow: () => BrowserWindowType | null): void {
-  mainWindowRef = getMainWindow;
+export function registerRecordingControl(deps: RecordingControlDeps): void {
+  recordingControlDeps = deps;
 
   ipcMain.on(IpcChannels.RECORDER_STATE_PUBLISH_CHANNEL, (_event, state: RecorderRemoteState) => {
     const previousPhase = remoteState.phase;
@@ -341,20 +473,65 @@ export function registerRecordingControl(getMainWindow: () => BrowserWindowType 
   });
 
   ipcMain.on(IpcChannels.RECORDER_COMMAND_CHANNEL, (_event, command: RecorderRemoteCommand) => {
-    sendRecorderCommand(command);
+    if (command === "show-main") {
+      showMainWindow();
+      return;
+    }
+
+    const main = recordingControlDeps?.getMainWindow();
+    if (main && !main.isDestroyed()) {
+      main.webContents.send(IpcChannels.RECORDER_COMMAND_CHANNEL, command);
+    }
   });
 
   tray = new Tray(createTrayIcon());
   tray.setToolTip("Ceer — Screen recorder");
   if (process.platform === "darwin") {
     tray.setTitle("");
-    // macOS: use the context menu only (right-click). Left-click does not open the app.
+    tray.on("right-click", () => {
+      void refreshTrayMenu();
+    });
   } else {
     tray.on("click", () => {
-      tray?.popUpContextMenu();
+      void refreshTrayMenu().then(() => {
+        tray?.popUpContextMenu();
+      });
     });
   }
-  updateTrayMenu();
+  void refreshTrayMenu();
+}
+
+/** macOS `activate` — avoid pulling focus to the main window when only the HUD is active. */
+export function handleAppActivate(): void {
+  const main = recordingControlDeps?.getMainWindow();
+  if (!main || main.isDestroyed()) {
+    return;
+  }
+
+  if (!main.isVisible()) {
+    if (main.isMinimized()) {
+      main.restore();
+    }
+    main.show();
+    main.focus();
+    return;
+  }
+
+  const hudSession =
+    remoteState.phase === "armed" ||
+    remoteState.phase === "recording" ||
+    remoteState.phase === "stopping";
+  const hudVisible =
+    Boolean(controlWidgetWindow && !controlWidgetWindow.isDestroyed() && controlWidgetWindow.isVisible());
+
+  if (hudSession && hudVisible) {
+    return;
+  }
+
+  if (main.isMinimized()) {
+    main.restore();
+  }
+  main.focus();
 }
 
 export function attachMainWindowCloseBehavior(window: BrowserWindow): void {

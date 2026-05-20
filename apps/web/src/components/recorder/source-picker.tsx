@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { filterSourcesByKind } from "~/hooks/use-desktop-sources";
 import { tiltClassForSourceId } from "~/lib/capture-source";
 import { loadingQuips, pickQuip } from "~/lib/quips";
@@ -43,6 +44,9 @@ export function SourcePicker({
   onPickArea,
 }: SourcePickerProps) {
   const [tab, setTab] = useState<CaptureSourceKind | "all">("all");
+  const bridge = useDesktopBridge();
+  const isMac = bridge?.getAppInfo().platform === "darwin";
+  const windowSources = filterSourcesByKind(sources, "window");
 
   return (
     <RecorderPanel
@@ -79,10 +83,22 @@ export function SourcePicker({
               disabled={disabled}
               loading={loading}
               onSelect={onSelect}
+              emptyHint={
+                isMac && item.value === "window" && windowSources.length === 0
+                  ? "No windows listed — fullscreen apps are usually only available as a Screen on macOS."
+                  : undefined
+              }
             />
           </TabsContent>
         ))}
       </Tabs>
+
+      {isMac ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          On macOS, apps in native fullscreen usually do not appear under Windows — choose the
+          matching Screen to record them.
+        </p>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -156,7 +172,14 @@ function AreaPickSection({
   );
 }
 
-function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: SourceGridProps) {
+function SourceGrid({
+  sources,
+  selectedId,
+  loading,
+  disabled,
+  onSelect,
+  emptyHint,
+}: SourceGridProps & { readonly emptyHint?: string }) {
   if (loading && sources.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">{pickQuip(loadingQuips)}</p>
@@ -165,7 +188,9 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
 
   if (sources.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-muted-foreground">Nothing here. Try another tab?</p>
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        {emptyHint ?? "Nothing here. Try another tab?"}
+      </p>
     );
   }
 

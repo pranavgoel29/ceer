@@ -15,3 +15,4 @@ export const AREA_PICKER_SOURCE_CHANGED_CHANNEL = "ceer:area-picker-source-chang
 export const RECORDER_STATE_PUBLISH_CHANNEL = "ceer:recorder-state-publish" as const;
 export const RECORDER_STATE_CHANNEL = "ceer:recorder-state" as const;
 export const RECORDER_COMMAND_CHANNEL = "ceer:recorder-command" as const;
+export const RECORDER_SELECT_SOURCE_CHANNEL = "ceer:recorder-select-source" as const;

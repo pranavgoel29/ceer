@@ -14,7 +14,7 @@ export async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
   return sources.map((source) => ({
     id: source.id,
     name: source.name,
-    kind: classifySourceKind(source.name),
+    kind: classifySourceKind(source.id),
     thumbnailDataUrl: source.thumbnail.toDataURL(),
     displayId: source.display_id,
   }));

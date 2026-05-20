@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { RecorderRemoteState } from "@ceer/contracts";
 import { Button } from "~/components/ui/button";
+import { getControlWidgetBridge } from "~/lib/control-widget-bridge";
 import { formatDuration } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
@@ -12,7 +13,27 @@ const defaultState: RecorderRemoteState = {
   canStop: false,
   elapsedMs: 0,
   sourceName: null,
+  armedSourceKind: null,
+  armedSourceDisplayId: null,
+  armedSourceId: null,
 };
+
+function controlWidgetStatusText(
+  state: RecorderRemoteState,
+  isStopping: boolean,
+  isRecording: boolean,
+): string {
+  if (isStopping) {
+    return "Finishing…";
+  }
+  if (isRecording) {
+    return "Recording";
+  }
+  if (state.canRecord) {
+    return "Ready";
+  }
+  return "Waiting…";
+}
 
 export function ControlWidgetPage() {
   const [state, setState] = useState<RecorderRemoteState>(defaultState);
@@ -21,7 +42,8 @@ export function ControlWidgetPage() {
     document.documentElement.classList.add("control-widget-root");
     document.body.classList.add("control-widget-root");
 
-    const unsubscribe = window.controlWidgetBridge?.onRecorderState((next) => {
+    const bridge = getControlWidgetBridge();
+    const unsubscribe = bridge?.onRecorderState((next: RecorderRemoteState) => {
       setState(next);
     });
 
@@ -34,36 +56,28 @@ export function ControlWidgetPage() {
 
   const isRecording = state.phase === "recording" || state.phase === "stopping";
   const isStopping = state.phase === "stopping";
+  const statusText = controlWidgetStatusText(state, isStopping, isRecording);
 
   const send = (command: "start" | "stop" | "show-main") => {
-    window.controlWidgetBridge?.sendRecorderCommand(command);
+    getControlWidgetBridge()?.sendRecorderCommand(command);
   };
 
   return (
     <div
       className={cn(
-        "flex h-screen w-screen items-center gap-2 rounded-2xl border border-border/60 px-3 py-2 shadow-xl",
+        "ceer-control-widget-drag flex h-screen w-screen items-center gap-2 rounded-2xl border border-border/60 px-3 py-2 shadow-xl",
         "bg-background/95 backdrop-blur-md",
         isRecording && "border-destructive/40",
       )}
-      style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
-      <div className="min-w-0 flex-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+      <div className="ceer-control-widget-no-drag min-w-0 flex-1">
         <p className="truncate text-xs font-semibold">
           {isRecording ? formatDuration(state.elapsedMs) : state.sourceName ?? "Ceer"}
         </p>
-        <p className="text-[10px] text-muted-foreground">
-          {isStopping
-            ? "Finishing…"
-            : isRecording
-              ? "Recording"
-              : state.canRecord
-                ? "Ready"
-                : "Waiting…"}
-        </p>
+        <p className="text-[10px] text-muted-foreground">{statusText}</p>
       </div>
 
-      <div className="flex shrink-0 gap-1.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+      <div className="ceer-control-widget-no-drag flex shrink-0 gap-1.5">
         <Button
           type="button"
           variant="ghost"

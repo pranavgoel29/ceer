@@ -27,6 +27,55 @@ function systemAudioUnavailableMessage(): string {
   return "System audio unavailable. On macOS you need 13+ and Screen Recording permission; window-only capture may have no audio.";
 }
 
+function setShareTracksEnabled(tracks: MediaStreamTrack[], enabled: boolean): void {
+  for (const track of tracks) {
+    track.enabled = enabled;
+  }
+}
+
+function applySystemAudioToStreams(
+  shareTracks: MediaStreamTrack[],
+  audioStreams: MediaStream[],
+  systemAudioEnabled: boolean,
+  onUnavailable: () => void,
+): void {
+  if (!systemAudioEnabled) {
+    setShareTracksEnabled(shareTracks, false);
+    return;
+  }
+
+  if (shareTracks.length === 0) {
+    onUnavailable();
+    return;
+  }
+
+  setShareTracksEnabled(shareTracks, true);
+  audioStreams.push(new MediaStream(shareTracks));
+}
+
+async function tryAppendMicStream(
+  audioStreams: MediaStream[],
+  micStreams: MediaStream[],
+  isMicStillEnabled: () => boolean,
+  onDenied: () => void,
+): Promise<void> {
+  try {
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+
+    if (isMicStillEnabled()) {
+      micStreams.push(micStream);
+      audioStreams.push(micStream);
+      return;
+    }
+
+    stopStreamTracks(micStream);
+  } catch {
+    onDenied();
+  }
+}
+
 export function useDesktopRecorder(): DesktopRecorderApi {
   const bridge = useDesktopBridge();
 
@@ -132,39 +181,23 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     const audioStreams: MediaStream[] = [];
     const shareTracks = displayStream.getAudioTracks();
 
-    if (systemAudioEnabledRef.current) {
-      if (shareTracks.length > 0) {
-        for (const track of shareTracks) {
-          track.enabled = true;
-        }
-        audioStreams.push(new MediaStream(shareTracks));
-      } else {
-        setError((previous) =>
-          previous ? `${previous} No shared audio.` : systemAudioUnavailableMessage(),
-        );
-      }
-    } else {
-      for (const track of shareTracks) {
-        track.enabled = false;
-      }
-    }
+    applySystemAudioToStreams(shareTracks, audioStreams, systemAudioEnabledRef.current, () => {
+      setError((previous) =>
+        previous ? `${previous} No shared audio.` : systemAudioUnavailableMessage(),
+      );
+    });
 
     if (micEnabledRef.current) {
-      try {
-        const micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-        });
-        if (!micEnabledRef.current) {
-          stopStreamTracks(micStream);
-        } else {
-          micStreamsRef.current.push(micStream);
-          audioStreams.push(micStream);
-        }
-      } catch {
-        setError((previous) =>
-          previous ? `${previous} Microphone denied.` : micPermissionMessage(),
-        );
-      }
+      await tryAppendMicStream(
+        audioStreams,
+        micStreamsRef.current,
+        () => micEnabledRef.current,
+        () => {
+          setError((previous) =>
+            previous ? `${previous} Microphone denied.` : micPermissionMessage(),
+          );
+        },
+      );
     }
 
     return audioStreams;
@@ -430,7 +463,7 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     }
 
     const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state !== "recording") {
+    if (recorder?.state !== "recording") {
       return;
     }
 
@@ -456,7 +489,7 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     return () => {
       clearTimer();
       const recorder = mediaRecorderRef.current;
-      if (recorder && recorder.state === "recording") {
+      if (recorder?.state === "recording") {
         try {
           recorder.stop();
         } catch {
@@ -486,6 +519,9 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       canStop: phase === "recording",
       elapsedMs,
       sourceName: armedSourceRef.current?.name ?? null,
+      armedSourceKind: armedSourceRef.current?.kind ?? null,
+      armedSourceDisplayId: armedSourceRef.current?.displayId ?? null,
+      armedSourceId: armedSourceRef.current?.id ?? null,
     });
   }, [bridge, phase, canArm, elapsedMs, previewLoading, audioMixing, armedSourceId]);
 
