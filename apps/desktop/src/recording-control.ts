@@ -376,12 +376,13 @@ function applyHudPresentation(window: BrowserWindow, fullscreenOverlay: boolean)
 
   if (process.platform === "darwin") {
     if (mode === "fullscreen-overlay") {
-      // Required for the HUD to appear above native fullscreen apps on their Space.
+      // `type: "panel"` (see createControlWidgetWindow) is what Electron documents for
+      // floating above other apps' native fullscreen. visibleOnFullScreen alone is unreliable.
       window.setVisibleOnAllWorkspaces(true, {
         visibleOnFullScreen: true,
         skipTransformProcessType: true,
       });
-      window.setAlwaysOnTop(true, "screen-saver");
+      window.setAlwaysOnTop(true, "screen-saver", 1);
       return;
     }
 
@@ -406,6 +407,9 @@ function createControlWidgetWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 272,
     height: 88,
+    ...(process.platform === "darwin"
+      ? { type: "panel" as const, acceptFirstMouse: true }
+      : {}),
     frame: false,
     transparent: true,
     resizable: false,
@@ -456,6 +460,8 @@ function showFloatingHud(window: BrowserWindow): void {
   }
 
   const fullscreenOverlay = shouldUseFullscreenOverlay();
+  // Re-apply macOS collection behaviors after hide/show (Electron fullscreen overlay is flaky otherwise).
+  hudPresentationMode = null;
   applyHudPresentation(window, fullscreenOverlay);
 
   if (!controlBarShown) {
@@ -513,9 +519,14 @@ function canPresentFloatingHud(): boolean {
     return false;
   }
 
-  // While recording, keep the HUD up over other apps. Only block the initial show when
-  // Ceer is inactive (e.g. Mission Control) so we do not steal focus on space switch.
-  if (process.platform === "darwin" && !appIsActive && !controlBarShown) {
+  // While recording, always allow the HUD over other apps/spaces. When only armed, block the
+  // initial auto-show while inactive (Mission Control) so we do not steal focus.
+  if (
+    process.platform === "darwin" &&
+    !appIsActive &&
+    !controlBarShown &&
+    !isRecordingPhase(remoteState.phase)
+  ) {
     return false;
   }
 
