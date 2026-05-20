@@ -52,7 +52,7 @@ export function WebCapturePanel({
       </div>
 
       {shareLabel && isArmed ? (
-        <div className="rounded-xl border border-ceer-lime/30 bg-ceer-lime/5 px-3 py-2.5">
+        <div className="ceer-accent-surface rounded-xl px-3 py-2.5">
           <p className="text-[10px] tracking-wide text-muted-foreground uppercase">Sharing</p>
           <p className="truncate text-sm font-medium">{shareLabel}</p>
         </div>

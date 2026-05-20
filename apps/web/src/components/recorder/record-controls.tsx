@@ -84,7 +84,7 @@ function AudioToggleRow({
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ceer-lime/10 text-ceer-lime">
+        <span className="ceer-icon-well flex size-9 shrink-0 items-center justify-center rounded-lg">
           <Icon className="size-4.5" weight="duotone" />
         </span>
         <div className="min-w-0">
@@ -127,7 +127,7 @@ function ExportSection({
 
   return (
     <PanelSection title="Export">
-      <div className="flex flex-col gap-4 rounded-xl border border-ceer-lime/25 bg-ceer-lime/5 p-3.5 text-sm">
+      <div className="ceer-export-panel flex flex-col gap-4 rounded-xl p-3.5 text-sm">
         <p className="text-muted-foreground">
           {formatDuration(recording.durationMs)} · {formatBytes(recording.blob.size)} · master WebM
         </p>
@@ -292,7 +292,7 @@ export function RecordControls(props: RecordControlsProps) {
               "h-14 w-full rounded-2xl text-base font-semibold shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]",
               isActiveCapture
                 ? "bg-destructive text-white hover:bg-destructive/90"
-                : "bg-ceer-coral text-background hover:bg-ceer-coral/90",
+                : "ceer-record-btn",
             )}
             disabled={!canRecord && !isActiveCapture}
             onClick={isActiveCapture ? onStop : onStart}

@@ -174,7 +174,7 @@ export function AreaPickerPage() {
       ) : null}
 
       <div
-        className="pointer-events-none absolute inset-0 bg-black/40"
+        className="ceer-picker-scrim pointer-events-none absolute inset-0"
         style={
           valid && rect
             ? {
@@ -187,7 +187,7 @@ export function AreaPickerPage() {
       {valid && rect ? <SelectionBox rect={rect} /> : null}
 
       <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
-        <p className="rounded-full bg-black/75 px-4 py-2 text-sm font-medium text-white shadow-lg">
+        <p className="ceer-picker-hint rounded-full px-4 py-2 text-sm font-medium shadow-lg">
           Drag to draw · Move inside · Drag handles to resize · Enter to confirm
         </p>
       </div>
@@ -212,7 +212,7 @@ export function AreaPickerPage() {
 function SelectionBox({ rect }: { rect: DragRect }) {
   return (
     <div
-      className="pointer-events-none absolute border-2 border-ceer-lime bg-ceer-lime/10"
+      className="ceer-picker-selection pointer-events-none absolute"
       style={{
         left: rect.x,
         top: rect.y,

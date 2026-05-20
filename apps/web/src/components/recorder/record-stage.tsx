@@ -100,9 +100,9 @@ export function RecordStage({
     >
       <div
         className={cn(
-          "ceer-stage-frame relative mx-4 mb-4 aspect-video overflow-hidden rounded-2xl border border-border/80 bg-black/70 sm:mx-5 sm:mb-5",
-          previewLoading && "border-ceer-lime/25",
-          isLive && "border-ceer-lime/35 shadow-[inset_0_0_80px_rgba(196,245,66,0.06)]",
+          "ceer-stage-frame ceer-stage-surface relative mx-4 mb-4 aspect-video overflow-hidden rounded-2xl border border-border/80 sm:mx-5 sm:mb-5",
+          previewLoading && "ceer-stage-frame--loading",
+          isLive && "ceer-stage-frame--live",
           phase === "recording" && "ceer-rec-frame",
         )}
       >
@@ -113,8 +113,8 @@ export function RecordStage({
         )}
 
         {previewLoading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-b from-background/55 to-background/75 p-8 text-center backdrop-blur-[2px]">
-            <span className="flex size-14 items-center justify-center rounded-2xl border border-ceer-lime/30 bg-ceer-lime/10 text-ceer-lime shadow-sm">
+          <div className="ceer-stage-overlay-loading absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center backdrop-blur-[2px]">
+            <span className="ceer-icon-well flex size-14 items-center justify-center rounded-2xl shadow-sm">
               <SpinnerIcon className="size-7 animate-spin" />
             </span>
             <div className="max-w-xs space-y-1">
@@ -123,7 +123,7 @@ export function RecordStage({
             </div>
           </div>
         ) : !isLive && !showPlayback ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-b from-background/50 to-background/70 p-8 text-center backdrop-blur-[1px]">
+          <div className="ceer-stage-overlay-idle absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center backdrop-blur-[1px]">
             <span className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-muted-foreground shadow-sm">
               <FilmSlateIcon className="size-7" weight="duotone" />
             </span>
@@ -137,7 +137,7 @@ export function RecordStage({
         ) : null}
 
         {captureRegion && isLive ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg border border-ceer-lime/30 bg-black/60 px-2 py-1 text-[10px] font-medium text-ceer-lime backdrop-blur-sm">
+          <div className="ceer-region-badge pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-medium backdrop-blur-sm">
             <ScanIcon className="size-3.5" weight="bold" />
             Cropped capture
           </div>

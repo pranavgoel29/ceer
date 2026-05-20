@@ -60,7 +60,7 @@ export function RecorderShell({
           ) : null}
 
           {shareAudioNotice && !combinedError ? (
-            <p className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-2.5 text-sm leading-relaxed text-amber-950 dark:text-amber-100">
+            <p className="ceer-notice rounded-xl px-4 py-2.5 text-sm leading-relaxed">
               {shareAudioNotice}
             </p>
           ) : null}

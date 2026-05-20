@@ -126,9 +126,9 @@ function AreaPickSection({
   const canPick = Boolean(targetId) && !disabled && !pickingArea;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-ceer-lime/35 bg-ceer-lime/5 p-3.5">
+    <div className="ceer-accent-surface-strong flex flex-col gap-3 rounded-xl p-3.5">
       <div className="flex items-start gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-ceer-lime/15 text-ceer-lime">
+        <span className="ceer-icon-well ceer-icon-well--strong flex size-8 shrink-0 items-center justify-center rounded-lg">
           <SquareIcon className="size-4" weight="duotone" />
         </span>
         <div className="min-w-0 flex-1">
@@ -144,7 +144,7 @@ function AreaPickSection({
         type="button"
         variant="outline"
         size="sm"
-        className="w-full border-ceer-lime/30"
+        className="ceer-border-lime w-full"
         disabled={!canPick}
         onClick={() => targetId && onPickArea(targetId)}
       >
@@ -182,15 +182,15 @@ function SourceGrid({ sources, selectedId, loading, disabled, onSelect }: Source
               className={cn(
                 "group box-border flex w-full flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
                 selected
-                  ? "border-ceer-lime bg-ceer-lime/10 shadow-[0_0_0_1px] shadow-ceer-lime/20"
-                  : "border-border/70 bg-muted/15 hover:border-ceer-coral/40 hover:bg-muted/35",
+                  ? "ceer-source-selected"
+                  : "ceer-source-hover border-border/70 bg-muted/15 hover:bg-muted/35",
                 disabled && "pointer-events-none opacity-50",
               )}
             >
-              <div className="relative aspect-video w-full shrink-0 bg-black/50 p-1.5">
+              <div className="ceer-thumbnail-frame relative aspect-video w-full shrink-0 p-1.5">
                 <div
                   className={cn(
-                    "relative size-full overflow-hidden rounded-lg bg-black/60 transition-transform duration-200",
+                    "ceer-thumbnail-inner relative size-full overflow-hidden rounded-lg transition-transform duration-200",
                     tilt,
                   )}
                 >
