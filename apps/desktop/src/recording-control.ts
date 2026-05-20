@@ -203,9 +203,9 @@ async function refreshTrayMenu(): Promise<void> {
     return;
   }
 
-  const isRecording = remoteState.phase === "recording" || remoteState.phase === "stopping";
-  const sourcesDisabled =
-    isRecording || remoteState.phase === "stopping" || areaPickerActive;
+  const isRecording = isRecordingPhase(remoteState.phase);
+  const sourcesDisabled = isRecording || areaPickerActive;
+  const canShowControlBar = canShowControlWidget();
 
   let sources: DesktopCaptureSource[] = [];
   try {
@@ -265,7 +265,7 @@ async function refreshTrayMenu(): Promise<void> {
     },
     {
       label: isControlBarMenuVisible() ? "Hide control bar" : "Show control bar",
-      enabled: isRecording,
+      enabled: canShowControlBar,
       click: () => toggleControlWidget(),
     },
     { type: "separator" },
@@ -363,19 +363,19 @@ function resolveHudDisplay(): Display {
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 }
 
-type HudPresentationMode = "standard" | "recording-overlay";
+type HudPresentationMode = "standard" | "fullscreen-overlay";
 
 let hudPresentationMode: HudPresentationMode | null = null;
 
-function applyHudPresentation(window: BrowserWindow, recordingOverlay: boolean): void {
-  const mode: HudPresentationMode = recordingOverlay ? "recording-overlay" : "standard";
+function applyHudPresentation(window: BrowserWindow, fullscreenOverlay: boolean): void {
+  const mode: HudPresentationMode = fullscreenOverlay ? "fullscreen-overlay" : "standard";
   if (hudPresentationMode === mode) {
     return;
   }
   hudPresentationMode = mode;
 
   if (process.platform === "darwin") {
-    if (mode === "recording-overlay") {
+    if (mode === "fullscreen-overlay") {
       // Required for the HUD to appear above native fullscreen apps on their Space.
       window.setVisibleOnAllWorkspaces(true, {
         visibleOnFullScreen: true,
@@ -390,7 +390,7 @@ function applyHudPresentation(window: BrowserWindow, recordingOverlay: boolean):
     return;
   }
 
-  window.setAlwaysOnTop(true, mode === "recording-overlay" ? "screen-saver" : "floating");
+  window.setAlwaysOnTop(true, mode === "fullscreen-overlay" ? "screen-saver" : "floating");
 }
 
 function loadControlWidgetPage(window: BrowserWindow): void {
@@ -455,14 +455,14 @@ function showFloatingHud(window: BrowserWindow): void {
     return;
   }
 
-  const recordingOverlay = isRecordingPhase(remoteState.phase);
-  applyHudPresentation(window, recordingOverlay);
+  const fullscreenOverlay = shouldUseFullscreenOverlay();
+  applyHudPresentation(window, fullscreenOverlay);
 
   if (!controlBarShown) {
     positionControlWidget(window);
     window.showInactive();
     controlBarShown = true;
-  } else if (recordingOverlay) {
+  } else if (fullscreenOverlay) {
     // Re-anchor when the armed display changes mid-session.
     positionControlWidget(window);
   }
@@ -474,22 +474,38 @@ function isRecordingPhase(phase: RecorderRemoteState["phase"]): boolean {
   return phase === "recording" || phase === "stopping";
 }
 
+function hasArmedCaptureTarget(state: RecorderRemoteState): boolean {
+  return (
+    state.phase === "armed" &&
+    state.canRecord &&
+    (Boolean(state.armedSourceId) || Boolean(state.sourceName))
+  );
+}
+
+function shouldUseFullscreenOverlay(): boolean {
+  return isRecordingPhase(remoteState.phase) || hasArmedCaptureTarget(remoteState);
+}
+
 function isControlBarMenuVisible(): boolean {
   return (
     hudVisiblePreference &&
-    isRecordingPhase(remoteState.phase) &&
+    shouldUseFullscreenOverlay() &&
     controlBarShown &&
     controlWidgetWindow !== null &&
     !controlWidgetWindow.isDestroyed()
   );
 }
 
-function shouldShowControlWidget(): boolean {
+function canShowControlWidget(): boolean {
   if (areaPickerActive) {
     return false;
   }
 
-  return hudVisiblePreference && isRecordingPhase(remoteState.phase);
+  return isRecordingPhase(remoteState.phase) || hasArmedCaptureTarget(remoteState);
+}
+
+function shouldShowControlWidget(): boolean {
+  return hudVisiblePreference && canShowControlWidget();
 }
 
 function canPresentFloatingHud(): boolean {
@@ -593,17 +609,26 @@ function toggleControlWidget(): void {
 
 function recorderStateAffectsHudVisibility(
   next: RecorderRemoteState,
-  previousPhase: RecorderRemoteState["phase"],
+  previous: RecorderRemoteState,
 ): boolean {
-  return next.phase !== previousPhase;
+  return (
+    next.phase !== previous.phase ||
+    next.canRecord !== previous.canRecord ||
+    next.canStop !== previous.canStop ||
+    next.armedSourceId !== previous.armedSourceId ||
+    next.armedSourceDisplayId !== previous.armedSourceDisplayId ||
+    next.armedSourceKind !== previous.armedSourceKind ||
+    next.sourceName !== previous.sourceName
+  );
 }
 
-function applyRemoteState(next: RecorderRemoteState, previousPhase: RecorderRemoteState["phase"]): void {
+function applyRemoteState(next: RecorderRemoteState, previous: RecorderRemoteState): void {
+  const previousPhase = previous.phase;
   remoteState = next;
 
   const isRecording = isRecordingPhase(next.phase);
   const previousRecording = isRecordingPhase(previousPhase);
-  const hudVisibilityChanged = recorderStateAffectsHudVisibility(next, previousPhase);
+  const hudVisibilityChanged = recorderStateAffectsHudVisibility(next, previous);
   setPowerSaveBlocker(isRecording);
 
   if (isRecording && !previousRecording) {
@@ -638,8 +663,7 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
   });
 
   ipcMain.on(IpcChannels.RECORDER_STATE_PUBLISH_CHANNEL, (_event, state: RecorderRemoteState) => {
-    const previousPhase = remoteState.phase;
-    applyRemoteState(state, previousPhase);
+    applyRemoteState(state, remoteState);
   });
 
   ipcMain.on(IpcChannels.RECORDER_COMMAND_CHANNEL, (_event, command: RecorderRemoteCommand) => {
@@ -730,8 +754,14 @@ export function handleAppActivate(): void {
   main.focus();
 }
 
-export function attachMainWindowCloseBehavior(window: BrowserWindow): void {
+export function attachMainWindowCloseBehavior(
+  window: BrowserWindow,
+  shouldCloseToTray: () => boolean,
+): void {
   window.on("close", (event) => {
+    if (!shouldCloseToTray()) {
+      return;
+    }
     event.preventDefault();
     window.hide();
   });

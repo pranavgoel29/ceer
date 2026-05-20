@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
+import { detachStaleDmgVolumes } from "./lib/detach-dmg-volumes.ts";
 import { desktopDir } from "./lib/paths.ts";
 import { stopPackagedInstances } from "./lib/stop-instances.ts";
 
@@ -8,6 +9,10 @@ import { stopPackagedInstances } from "./lib/stop-instances.ts";
 const winUnpacked = join(desktopDir, "dist-out", "win-unpacked");
 
 stopPackagedInstances();
+
+if (!detachStaleDmgVolumes()) {
+  process.exit(1);
+}
 
 if (!existsSync(winUnpacked)) {
   process.exit(0);

@@ -25,6 +25,7 @@ if (!hasSingleInstanceLock) {
 let mainWindow: BrowserWindow | null = null;
 let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
+let isQuitting = false;
 
 function resolvePreloadPath(): string {
   return path.join(__dirname, "preload.cjs");
@@ -75,7 +76,7 @@ function createMainWindow(): BrowserWindow {
     window.show();
   });
 
-  attachMainWindowCloseBehavior(window);
+  attachMainWindowCloseBehavior(window, () => !isQuitting);
   mainWindow = window;
   return window;
 }
@@ -124,6 +125,31 @@ function registerIpcHandlers(): void {
   });
 }
 
+function initializeApp(): void {
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(resolveAppIconPath());
+  }
+
+  wireDisplayMediaHandler();
+  registerIpcHandlers();
+  registerAreaPickerHandlers(() => mainWindow);
+  registerRecordingControl({
+    getMainWindow: () => mainWindow,
+    setCaptureSource: (source) => {
+      selectedCaptureSource = source;
+    },
+  });
+  createMainWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createMainWindow();
+      return;
+    }
+    handleAppActivate();
+  });
+}
+
 app.setName(appName);
 
 if (process.platform === "win32") {
@@ -141,30 +167,7 @@ if (hasSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(() => {
-    if (process.platform === "darwin" && app.dock) {
-      app.dock.setIcon(resolveAppIconPath());
-    }
-
-    wireDisplayMediaHandler();
-    registerIpcHandlers();
-    registerAreaPickerHandlers(() => mainWindow);
-    registerRecordingControl({
-      getMainWindow: () => mainWindow,
-      setCaptureSource: (source) => {
-        selectedCaptureSource = source;
-      },
-    });
-    createMainWindow();
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-        return;
-      }
-      handleAppActivate();
-    });
-  });
+  app.on("ready", initializeApp);
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
@@ -173,6 +176,7 @@ if (hasSingleInstanceLock) {
   });
 
   app.on("before-quit", () => {
+    isQuitting = true;
     selectedCaptureSource = null;
     capturePreferences = { systemAudioEnabled: true };
   });
