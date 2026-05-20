@@ -29,4 +29,8 @@ export default defineConfig([
     ...shared,
     entry: ["src/area-picker-preload.ts"],
   },
+  {
+    ...shared,
+    entry: ["src/control-widget-preload.ts"],
+  },
 ]);

@@ -217,6 +217,12 @@
     background: transparent !important;
     overflow: hidden;
   }
+  html.control-widget-root,
+  body.control-widget-root,
+  html.control-widget-root #root {
+    background: transparent !important;
+    overflow: hidden;
+  }
 }
 
 @layer utilities {

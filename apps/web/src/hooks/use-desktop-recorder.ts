@@ -475,6 +475,38 @@ export function useDesktopRecorder(): DesktopRecorderApi {
 
   const canArm = phase === "armed" && !previewLoading && !audioMixing;
 
+  useEffect(() => {
+    if (!bridge) {
+      return;
+    }
+
+    bridge.publishRecorderState({
+      phase,
+      canRecord: canArm,
+      canStop: phase === "recording",
+      elapsedMs,
+      sourceName: armedSourceRef.current?.name ?? null,
+    });
+  }, [bridge, phase, canArm, elapsedMs, previewLoading, audioMixing, armedSourceId]);
+
+  useEffect(() => {
+    if (!bridge) {
+      return;
+    }
+
+    return bridge.onRecorderCommand((command) => {
+      if (command === "start") {
+        startRecording();
+      }
+      if (command === "stop") {
+        stopRecording();
+      }
+      if (command === "show-main") {
+        // Main process restores the window; no renderer action needed.
+      }
+    });
+  }, [bridge, startRecording, stopRecording]);
+
   return {
     platform: "desktop",
     phase,

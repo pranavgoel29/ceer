@@ -9,6 +9,10 @@ export interface DesktopBridge {
   readonly requestMicrophoneAccess: () => Promise<boolean>;
   /** Opens a fullscreen overlay on the source display; null if cancelled. */
   readonly pickCaptureRegion: (sourceId: string) => Promise<CaptureRegionPickResult | null>;
+  /** Push recorder state to main (tray/HUD); call from the main window only. */
+  readonly publishRecorderState: (state: RecorderRemoteState) => void;
+  /** Commands forwarded from tray/HUD (start, stop, show-main). */
+  readonly onRecorderCommand: (listener: (command: RecorderRemoteCommand) => void) => () => void;
 }
 
 export interface DesktopAppInfo {
@@ -39,7 +43,7 @@ export interface CaptureSourceRef {
   readonly kind: CaptureSourceKind;
 }
 
-/** Rectangle in display logical pixels (origin top-left of the target display). */
+/** Rectangle in logical pixels (display or window-content space). */
 export interface CaptureRegion {
   readonly x: number;
   readonly y: number;
@@ -52,22 +56,55 @@ export interface DisplayBounds {
   readonly height: number;
 }
 
+export type RegionCoordinateSpace = "display" | "window";
+
 export interface CaptureRegionPickResult {
   readonly region: CaptureRegion;
   readonly display: DisplayBounds;
+  readonly coordinateSpace: RegionCoordinateSpace;
+  readonly sourceId: string;
+  readonly sourceName: string;
+  readonly sourceKind: CaptureSourceKind;
 }
+
+export type RecorderPhase = "idle" | "armed" | "recording" | "stopping" | "stopped";
+
+export interface RecorderRemoteState {
+  readonly phase: RecorderPhase;
+  readonly canRecord: boolean;
+  readonly canStop: boolean;
+  readonly elapsedMs: number;
+  readonly sourceName: string | null;
+}
+
+export type RecorderRemoteCommand = "start" | "stop" | "show-main";
 
 declare global {
   interface Window {
     desktopBridge?: DesktopBridge;
     areaPickerBridge?: AreaPickerBridge;
+    controlWidgetBridge?: ControlWidgetBridge;
   }
+}
+
+export interface AreaPickerActiveSource {
+  readonly sourceId: string;
+  readonly kind: CaptureSourceKind;
 }
 
 export interface AreaPickerBridge {
   readonly getBackground: () => string | null;
+  readonly getSources: () => DesktopCaptureSource[];
+  readonly getActiveSource: () => AreaPickerActiveSource;
+  readonly setSource: (sourceId: string) => void;
+  readonly onSourceChanged: (listener: () => void) => () => void;
   readonly complete: (region: CaptureRegion) => void;
   readonly cancel: () => void;
+}
+
+export interface ControlWidgetBridge {
+  readonly onRecorderState: (listener: (state: RecorderRemoteState) => void) => () => void;
+  readonly sendRecorderCommand: (command: RecorderRemoteCommand) => void;
 }
 
 export {};

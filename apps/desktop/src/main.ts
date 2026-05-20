@@ -1,11 +1,13 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, session, systemPreferences } from "electron";
+import { app, BrowserWindow, ipcMain, session, systemPreferences } from "electron";
 import path from "node:path";
 
-import type { CapturePreferences, CaptureSourceRef, DesktopCaptureSource } from "@ceer/contracts";
+import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
 import * as IpcChannels from "./ipc/channels.ts";
-import { classifySourceKind, resolveCapturerSource } from "./resolve-capture-source.ts";
+import { listDesktopSources } from "./list-desktop-sources.ts";
+import { attachMainWindowCloseBehavior, registerRecordingControl } from "./recording-control.ts";
+import { resolveCapturerSource } from "./resolve-capture-source.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
@@ -16,6 +18,7 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 
+let mainWindow: BrowserWindow | null = null;
 let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 
@@ -31,25 +34,10 @@ function resolveAppIconPath(): string {
   return path.join(__dirname, "../resources", iconFile);
 }
 
-async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
-  const sources = await desktopCapturer.getSources({
-    types: ["screen", "window"],
-    thumbnailSize: { width: 360, height: 203 },
-    fetchWindowIcons: true,
-  });
-
-  return sources.map((source) => ({
-    id: source.id,
-    name: source.name,
-    kind: classifySourceKind(source.name),
-    thumbnailDataUrl: source.thumbnail.toDataURL(),
-    displayId: source.display_id,
-  }));
-}
-
 function registerDisplayMediaHandler(): void {
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     void (async () => {
+      const { desktopCapturer } = await import("electron");
       const sources = await desktopCapturer.getSources({
         types: ["screen", "window"],
         thumbnailSize: { width: 1, height: 1 },
@@ -102,6 +90,8 @@ function createMainWindow(): BrowserWindow {
     window.show();
   });
 
+  attachMainWindowCloseBehavior(window);
+  mainWindow = window;
   return window;
 }
 
@@ -157,12 +147,12 @@ if (process.platform === "win32") {
 
 if (hasSingleInstanceLock) {
   app.on("second-instance", () => {
-    const existing = BrowserWindow.getAllWindows()[0];
-    if (existing) {
-      if (existing.isMinimized()) {
-        existing.restore();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
       }
-      existing.focus();
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
 
@@ -173,12 +163,16 @@ if (hasSingleInstanceLock) {
 
     registerDisplayMediaHandler();
     registerIpcHandlers();
-    registerAreaPickerHandlers();
+    registerAreaPickerHandlers(() => mainWindow);
+    registerRecordingControl(() => mainWindow);
     createMainWindow();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createMainWindow();
+      } else if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
       }
     });
   });

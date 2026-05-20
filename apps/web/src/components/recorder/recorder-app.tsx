@@ -106,9 +106,34 @@ function DesktopRecorderContent() {
       return;
     }
 
-    setAreaSourceId(sourceId);
+    let captureRef: CaptureSourceRef = {
+      id: pick.sourceId,
+      name: pick.sourceName,
+      kind: pick.sourceKind,
+    };
+
+    // Region coordinates are in display space; crop requires a screen capture target.
+    if (pick.sourceKind === "window") {
+      const windowSource = sources.find((item) => item.id === pick.sourceId);
+      const screenSource =
+        sources.find(
+          (item) =>
+            item.kind === "screen" &&
+            (windowSource?.displayId
+              ? item.displayId === windowSource.displayId
+              : true),
+        ) ?? sources.find((item) => item.kind === "screen");
+
+      if (screenSource) {
+        captureRef = toCaptureSourceRef(screenSource);
+      }
+    }
+
+    setAreaSourceId(pick.sourceId);
+    setSelectedSource(captureRef);
+    bridge.setCaptureSource(captureRef);
     recorder.discardRecording();
-    void recorder.armPreview(ref, pick);
+    void recorder.armPreview(captureRef, pick);
   };
 
   const rearmIfPossible = () => {

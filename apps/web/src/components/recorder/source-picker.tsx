@@ -121,8 +121,10 @@ function AreaPickSection({
   disabled?: boolean;
   onPickArea: (sourceId: string) => void;
 }) {
-  const screenSources = sources.filter((source) => source.kind === "screen");
-  const targetId = selectedId && screenSources.some((s) => s.id === selectedId) ? selectedId : screenSources[0]?.id;
+  const targetId =
+    selectedId && sources.some((source) => source.id === selectedId)
+      ? selectedId
+      : sources[0]?.id;
   const canPick = Boolean(targetId) && !disabled && !pickingArea;
 
   return (
@@ -134,9 +136,9 @@ function AreaPickSection({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">Snip a region</p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {screenSources.length === 0
-              ? "Choose a display under Screens first."
-              : "Draw a rectangle on the display; we crop the capture to match."}
+            {sources.length === 0
+              ? "Refresh sources, then pick a screen or window."
+              : "Opens an overlay — switch targets there, then draw a crop region."}
           </p>
         </div>
       </div>
