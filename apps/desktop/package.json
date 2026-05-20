@@ -10,6 +10,7 @@
     "dev": "bun run --parallel dev:bundle dev:electron",
     "dev:bundle": "tsdown --watch",
     "dev:electron": "node scripts/dev-electron.mjs",
+    "dev:kill": "node scripts/kill-dev-electron.mjs",
     "build": "tsdown",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",

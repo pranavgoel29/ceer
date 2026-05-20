@@ -10,6 +10,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "turbo run dev --filter=@ceer/web",
     "dev:desktop": "node scripts/dev.mjs desktop",
+    "dev:kill": "bun run --cwd apps/desktop dev:kill",
     "build": "turbo run build",
     "dist:mac": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:mac",
     "dist:win": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:win",

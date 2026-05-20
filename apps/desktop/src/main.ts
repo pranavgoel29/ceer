@@ -11,6 +11,11 @@ import { resolveProductionIndexPath } from "./resolve-renderer.ts";
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 let selectedCaptureSource: CaptureSourceRef | null = null;
 let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 
@@ -145,30 +150,42 @@ function registerIpcHandlers(): void {
 
 app.setName(appName);
 
-app.whenReady().then(() => {
-  if (process.platform === "darwin" && app.dock) {
-    app.dock.setIcon(resolveAppIconPath());
-  }
-
-  registerDisplayMediaHandler();
-  registerIpcHandlers();
-  registerAreaPickerHandlers();
-  createMainWindow();
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+if (hasSingleInstanceLock) {
+  app.on("second-instance", () => {
+    const existing = BrowserWindow.getAllWindows()[0];
+    if (existing) {
+      if (existing.isMinimized()) {
+        existing.restore();
+      }
+      existing.focus();
     }
   });
-});
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+  app.whenReady().then(() => {
+    if (process.platform === "darwin" && app.dock) {
+      app.dock.setIcon(resolveAppIconPath());
+    }
 
-app.on("before-quit", () => {
-  selectedCaptureSource = null;
-  capturePreferences = { systemAudioEnabled: true };
-});
+    registerDisplayMediaHandler();
+    registerIpcHandlers();
+    registerAreaPickerHandlers();
+    createMainWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+      }
+    });
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
+
+  app.on("before-quit", () => {
+    selectedCaptureSource = null;
+    capturePreferences = { systemAudioEnabled: true };
+  });
+}
