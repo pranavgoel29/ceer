@@ -5,6 +5,7 @@
     "": {
       "name": "@ceer/monorepo",
       "devDependencies": {
+        "@types/node": "^22.15.0",
         "turbo": "^2.5.4",
         "typescript": "^5.8.3",
       },

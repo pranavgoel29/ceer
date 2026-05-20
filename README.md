@@ -240,7 +240,7 @@ Edit `apps/desktop/resources/icon.svg`, then regenerate raster assets (desktop d
 bun run generate:icons
 ```
 
-Outputs `icon.png`, `icon.icns`, `icon.ico`, `icon.iconset/`, plus web-only `favicon.svg` (tighter crop), `favicon.ico`, `favicon-32.png`, and `favicon-192.png`. `scripts/generate-icons.mjs` parses `icon.svg` in pure Node (no npm deps); `.icns` uses macOS `iconutil`. Vite serves the `favicon.*` assets from `apps/desktop/resources/`.
+Outputs `icon.png`, `icon.icns`, `icon.ico`, `icon.iconset/`, plus web-only `favicon.svg` (tighter crop), `favicon.ico`, `favicon-32.png`, and `favicon-192.png`. `scripts/generate-icons.ts` parses `icon.svg` in pure Node (no npm deps); `.icns` uses macOS `iconutil`. Vite serves the `favicon.*` assets from `apps/desktop/resources/`.
 
 ## Package installers
 
@@ -298,7 +298,7 @@ ceer/
 │               └── export-recording.ts
 ├── packages/contracts/              # IPC + capture types
 ├── scripts/
-│   ├── dev.mjs
-│   └── ensure-electron.mjs
+│   ├── dev.ts
+│   └── ensure-electron.ts
 └── package.json
 ```

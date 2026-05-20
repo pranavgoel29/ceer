@@ -8,7 +8,7 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const desktopPackageJson = join(repoRoot, "apps/desktop/package.json");
 const require = createRequire(desktopPackageJson);
 
-function resolveElectronDir() {
+function resolveElectronDir(): string | null {
   try {
     return dirname(require.resolve("electron/package.json"));
   } catch {
@@ -16,7 +16,7 @@ function resolveElectronDir() {
   }
 }
 
-function platformRelativePath() {
+function platformRelativePath(): string {
   switch (process.platform) {
     case "darwin":
       return "Electron.app/Contents/MacOS/Electron";
@@ -27,16 +27,16 @@ function platformRelativePath() {
   }
 }
 
-function tryResolveElectronBinary() {
+function tryResolveElectronBinary(): string | null {
   try {
-    const binaryPath = require("electron");
+    const binaryPath = require("electron") as string;
     return typeof binaryPath === "string" && existsSync(binaryPath) ? binaryPath : null;
   } catch {
     return null;
   }
 }
 
-function repairPathTxt(electronDir) {
+function repairPathTxt(electronDir: string): boolean {
   const relativePath = platformRelativePath();
   const binaryPath = join(electronDir, "dist", relativePath);
   if (!existsSync(binaryPath)) {

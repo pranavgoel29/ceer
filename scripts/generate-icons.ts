@@ -9,14 +9,42 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
+type Rgba = [number, number, number, number];
+type Fill = Rgba | { type: "coral-gradient" };
+
+type IconCircle = {
+  cx: number;
+  cy: number;
+  r: number;
+  fill: Fill;
+  index: number;
+};
+
+type IconSpec = {
+  size: number;
+  gradient: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    start: Rgba;
+    end: Rgba;
+  };
+  shadow: { dx: number; dy: number; blur: number; opacity: number };
+  squircle: { cx: number; cy: number; hw: number; hh: number; radius: number };
+  circles: IconCircle[];
+};
+
+type Frame = { width: number; height: number; rgba: Uint8Array };
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const resourcesDir = path.join(repoRoot, "apps/desktop/resources");
 const svgPath = path.join(resourcesDir, "icon.svg");
 const iconsetDir = path.join(resourcesDir, "icon.iconset");
-const TRANSPARENT = [0, 0, 0, 0];
+const TRANSPARENT: Rgba = [0, 0, 0, 0];
 
-const iconsetSizes = [
+const iconsetSizes: [string, number][] = [
   ["icon_16x16.png", 16],
   ["icon_16x16@2x.png", 32],
   ["icon_32x32.png", 32],
@@ -33,30 +61,25 @@ const icoSizes = [16, 24, 32, 48, 64, 128, 256];
 
 // --- SVG parse (icon.svg is the single source of truth) ----------------------
 
-function attr(tag, name) {
+function attr(tag: string, name: string): string | null {
   const re = new RegExp(`${name}=["']([^"']+)["']`);
-  const m = tag.match(re);
-  if (!m) return null;
-  return m[1];
+  const m = re.exec(tag);
+  return m?.[1] ?? null;
 }
 
-function attrNum(tag, name) {
+function attrNum(tag: string, name: string): number | null {
   const v = attr(tag, name);
   return v == null ? null : Number(v);
 }
 
-function parseColor(raw) {
+function parseColor(raw: string | null): Fill | null {
   if (!raw) return null;
   const s = raw.trim();
   if (s.startsWith("#")) {
     const hex = s.slice(1);
     if (hex.length === 3) {
-      return [
-        Number.parseInt(hex[0] + hex[0], 16),
-        Number.parseInt(hex[1] + hex[1], 16),
-        Number.parseInt(hex[2] + hex[2], 16),
-        255,
-      ];
+      const channel = (index: number) => Number.parseInt(hex.charAt(index) + hex.charAt(index), 16);
+      return [channel(0), channel(1), channel(2), 255] as Rgba;
     }
     if (hex.length === 6) {
       return [
@@ -64,12 +87,12 @@ function parseColor(raw) {
         Number.parseInt(hex.slice(2, 4), 16),
         Number.parseInt(hex.slice(4, 6), 16),
         255,
-      ];
+      ] as Rgba;
     }
   }
-  const rgb = s.match(/^rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\)$/);
-  if (rgb) {
-    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), 255];
+  const rgbMatch = /^rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\)$/.exec(s);
+  if (rgbMatch) {
+    return [Number(rgbMatch[1]), Number(rgbMatch[2]), Number(rgbMatch[3]), 255] as Rgba;
   }
   if (s === "url(#coral)" || s.includes("#coral")) {
     return { type: "coral-gradient" };
@@ -77,22 +100,24 @@ function parseColor(raw) {
   throw new Error(`Unsupported fill: ${raw}`);
 }
 
-function parseIconSvg(filePath) {
+function parseIconSvg(filePath: string): IconSpec {
   const svg = readFileSync(filePath, "utf8");
 
   const viewBox = svg.match(/viewBox=["']0\s+0\s+(\d+)\s+(\d+)["']/);
-  const size = viewBox ? Number(viewBox[1]) : 1024;
+  const size = viewBox?.[1] ? Number(viewBox[1]) : 1024;
 
   const gradBlock = svg.match(/<linearGradient[^>]*id=["']coral["'][^>]*>[\s\S]*?<\/linearGradient>/);
   if (!gradBlock) {
     throw new Error("icon.svg: missing linearGradient#coral");
   }
   const gradTag = gradBlock[0].split(">")[0] + ">";
-  const stopColors = [...gradBlock[0].matchAll(/stop-color=["']rgb\(([^"']+)\)["']/g)].map((m) => {
-    const [r, g, b] = m[1].split(/\s+/).map(Number);
-    return [r, g, b, 255];
+  const stopColors: Rgba[] = [...gradBlock[0].matchAll(/stop-color=["']rgb\(([^"']+)\)["']/g)].map((m) => {
+    const [r, g, b] = m[1]!.split(/\s+/).map(Number);
+    return [r, g, b, 255] as Rgba;
   });
-  if (stopColors.length < 2) {
+  const gradientStart = stopColors.at(0);
+  const gradientEnd = stopColors.at(1);
+  if (gradientStart === undefined || gradientEnd === undefined) {
     throw new Error("icon.svg: coral gradient needs two stops");
   }
 
@@ -118,13 +143,16 @@ function parseIconSvg(filePath) {
     radius: rx,
   };
 
-  const circles = [...svg.matchAll(/<circle[^>]*\/>/g)].map((m, i) => {
-    const tag = m[0];
+  const circles: IconCircle[] = [...svg.matchAll(/<circle[^>]*\/>/g)].map((m, i) => {
+    const tag = m[0]!;
     const fill = parseColor(attr(tag, "fill"));
+    if (!fill) {
+      throw new Error(`icon.svg: circle ${i} has no fill`);
+    }
     return {
-      cx: attrNum(tag, "cx"),
-      cy: attrNum(tag, "cy"),
-      r: attrNum(tag, "r"),
+      cx: attrNum(tag, "cx") ?? 0,
+      cy: attrNum(tag, "cy") ?? 0,
+      r: attrNum(tag, "r") ?? 0,
       fill,
       index: i,
     };
@@ -141,8 +169,8 @@ function parseIconSvg(filePath) {
       y1: attrNum(gradTag, "y1") ?? 134,
       x2: attrNum(gradTag, "x2") ?? 820,
       y2: attrNum(gradTag, "y2") ?? 892,
-      start: stopColors[0],
-      end: stopColors[1],
+      start: gradientStart,
+      end: gradientEnd,
     },
     shadow,
     squircle,
@@ -152,7 +180,7 @@ function parseIconSvg(filePath) {
 
 // --- color / shape helpers ---------------------------------------------------
 
-function mix(a, b, t) {
+function mix(a: Rgba, b: Rgba, t: number): Rgba {
   return [
     Math.round(a[0] + (b[0] - a[0]) * t),
     Math.round(a[1] + (b[1] - a[1]) * t),
@@ -161,7 +189,7 @@ function mix(a, b, t) {
   ];
 }
 
-function over(dst, src) {
+function over(dst: Rgba, src: Rgba): Rgba {
   const sa = src[3] / 255;
   if (sa <= 0) return dst;
   const inv = 1 - sa;
@@ -176,23 +204,31 @@ function over(dst, src) {
   ];
 }
 
-function aaCoverage(distance) {
+function aaCoverage(distance: number): number {
   if (distance <= -1) return 1;
   if (distance >= 1) return 0;
   return Math.max(0, Math.min(1, 0.5 - distance));
 }
 
-function sdRoundBox(px, py, cx, cy, hw, hh, radius) {
+function sdRoundBox(
+  px: number,
+  py: number,
+  cx: number,
+  cy: number,
+  hw: number,
+  hh: number,
+  radius: number,
+): number {
   const x = Math.abs(px - cx) - hw + radius;
   const y = Math.abs(py - cy) - hh + radius;
   return Math.min(Math.max(x, y), 0) + Math.hypot(Math.max(x, 0), Math.max(y, 0)) - radius;
 }
 
-function sdCircle(px, py, cx, cy, radius) {
+function sdCircle(px: number, py: number, cx: number, cy: number, radius: number): number {
   return Math.hypot(px - cx, py - cy) - radius;
 }
 
-function sampleCoralGradient(px, py, gradient) {
+function sampleCoralGradient(px: number, py: number, gradient: IconSpec["gradient"]): Rgba {
   const { x1, y1, x2, y2, start, end } = gradient;
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -202,20 +238,30 @@ function sampleCoralGradient(px, py, gradient) {
   return mix(start, end, t);
 }
 
-function layerCircle(px, py, circle, fill) {
+function layerCircle(px: number, py: number, circle: IconCircle, fill: Rgba): Rgba | null {
   const cov = aaCoverage(sdCircle(px, py, circle.cx, circle.cy, circle.r));
   if (cov <= 0) return null;
   return [fill[0], fill[1], fill[2], Math.round(cov * 255)];
 }
 
-function layerCoralCircle(px, py, circle, gradient) {
+function layerCoralCircle(
+  px: number,
+  py: number,
+  circle: IconCircle,
+  gradient: IconSpec["gradient"],
+): Rgba | null {
   const cov = aaCoverage(sdCircle(px, py, circle.cx, circle.cy, circle.r));
   if (cov <= 0) return null;
   const g = sampleCoralGradient(px, py, gradient);
   return [g[0], g[1], g[2], Math.round(cov * 255)];
 }
 
-function shadowCoverage(px, py, squircle, shadow) {
+function shadowCoverage(
+  px: number,
+  py: number,
+  squircle: IconSpec["squircle"],
+  shadow: IconSpec["shadow"],
+): number {
   const d = sdRoundBox(px, py + shadow.dy, squircle.cx, squircle.cy, squircle.hw, squircle.hh, squircle.radius);
   const feather = shadow.blur;
   if (d <= -feather) return shadow.opacity;
@@ -224,44 +270,74 @@ function shadowCoverage(px, py, squircle, shadow) {
   return shadow.opacity * Math.max(0, Math.min(1, t));
 }
 
-function renderMaster(spec, outputSize = spec.size) {
-  const { size, gradient, shadow, squircle, circles } = spec;
+function applyShadowLayer(pixel: Rgba, px: number, py: number, squircle: IconSpec["squircle"], shadow: IconSpec["shadow"]): Rgba {
+  const sh = shadowCoverage(px, py, squircle, shadow);
+  if (sh <= 0) {
+    return pixel;
+  }
+  return over(pixel, [0, 0, 0, Math.round(sh * 255)]);
+}
+
+function applySquircleLayer(
+  pixel: Rgba,
+  px: number,
+  py: number,
+  squircle: IconSpec["squircle"],
+  gradient: IconSpec["gradient"],
+): Rgba {
+  const sqD = sdRoundBox(px, py, squircle.cx, squircle.cy, squircle.hw, squircle.hh, squircle.radius);
+  const squircleCov = aaCoverage(sqD);
+  if (squircleCov <= 0) {
+    return pixel;
+  }
+  const g = sampleCoralGradient(px, py, gradient);
+  return over(pixel, [g[0], g[1], g[2], Math.round(squircleCov * 255)]);
+}
+
+function applyCircleLayers(
+  pixel: Rgba,
+  px: number,
+  py: number,
+  circles: IconCircle[],
+  gradient: IconSpec["gradient"],
+): Rgba {
+  let composed = pixel;
+  for (const circle of circles) {
+    const layer =
+      "type" in circle.fill && circle.fill.type === "coral-gradient"
+        ? layerCoralCircle(px, py, circle, gradient)
+        : layerCircle(px, py, circle, circle.fill as Rgba);
+    if (layer) {
+      composed = over(composed, layer);
+    }
+  }
+  return composed;
+}
+
+function renderPixel(px: number, py: number, spec: IconSpec): Rgba {
+  let pixel = TRANSPARENT;
+  pixel = applyShadowLayer(pixel, px, py, spec.squircle, spec.shadow);
+  pixel = applySquircleLayer(pixel, px, py, spec.squircle, spec.gradient);
+  return applyCircleLayers(pixel, px, py, spec.circles, spec.gradient);
+}
+
+function writePixel(rgba: Uint8Array, outputSize: number, x: number, y: number, pixel: Rgba): void {
+  const i = (y * outputSize + x) * 4;
+  rgba[i] = pixel[0];
+  rgba[i + 1] = pixel[1];
+  rgba[i + 2] = pixel[2];
+  rgba[i + 3] = pixel[3];
+}
+
+function renderMaster(spec: IconSpec, outputSize = spec.size): Frame {
   const rgba = new Uint8Array(outputSize * outputSize * 4);
-  const scale = outputSize / size;
+  const scale = outputSize / spec.size;
 
   for (let y = 0; y < outputSize; y++) {
     for (let x = 0; x < outputSize; x++) {
       const px = (x + 0.5) / scale;
       const py = (y + 0.5) / scale;
-      let pixel = TRANSPARENT;
-
-      const sh = shadowCoverage(px, py, squircle, shadow);
-      if (sh > 0) {
-        pixel = over(pixel, [0, 0, 0, Math.round(sh * 255)]);
-      }
-
-      const sqD = sdRoundBox(px, py, squircle.cx, squircle.cy, squircle.hw, squircle.hh, squircle.radius);
-      const squircleCov = aaCoverage(sqD);
-      if (squircleCov > 0) {
-        const g = sampleCoralGradient(px, py, gradient);
-        pixel = over(pixel, [g[0], g[1], g[2], Math.round(squircleCov * 255)]);
-      }
-
-      for (const circle of circles) {
-        let layer = null;
-        if (circle.fill?.type === "coral-gradient") {
-          layer = layerCoralCircle(px, py, circle, gradient);
-        } else {
-          layer = layerCircle(px, py, circle, circle.fill);
-        }
-        if (layer) pixel = over(pixel, layer);
-      }
-
-      const i = (y * outputSize + x) * 4;
-      rgba[i] = pixel[0];
-      rgba[i + 1] = pixel[1];
-      rgba[i + 2] = pixel[2];
-      rgba[i + 3] = pixel[3];
+      writePixel(rgba, outputSize, x, y, renderPixel(px, py, spec));
     }
   }
 
@@ -270,25 +346,28 @@ function renderMaster(spec, outputSize = spec.size) {
 
 // --- PNG encode/decode -------------------------------------------------------
 
-function crc32(buf) {
-  if (!crc32.table) {
-    crc32.table = new Uint32Array(256);
+let crc32Table: Uint32Array | undefined;
+
+function crc32(buf: Buffer): number {
+  if (!crc32Table) {
+    crc32Table = new Uint32Array(256);
     for (let n = 0; n < 256; n++) {
       let c = n;
       for (let k = 0; k < 8; k++) {
         c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
       }
-      crc32.table[n] = c;
+      crc32Table[n] = c;
     }
   }
   let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    c = crc32.table[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  const table = crc32Table;
+  for (const byte of buf) {
+    c = (table[(c ^ byte) & 0xff] ?? 0) ^ (c >>> 8);
   }
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function pngChunk(type, data) {
+function pngChunk(type: string, data: Buffer): Buffer {
   const typeBuf = Buffer.from(type);
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length, 0);
@@ -297,7 +376,7 @@ function pngChunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf]);
 }
 
-function encodePng({ width, height, rgba }) {
+function encodePng({ width, height, rgba }: Frame): Buffer {
   const stride = width * 4 + 1;
   const raw = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y++) {
@@ -306,10 +385,10 @@ function encodePng({ width, height, rgba }) {
     for (let x = 0; x < width; x++) {
       const si = (y * width + x) * 4;
       const di = row + 1 + x * 4;
-      raw[di] = rgba[si];
-      raw[di + 1] = rgba[si + 1];
-      raw[di + 2] = rgba[si + 2];
-      raw[di + 3] = rgba[si + 3];
+      raw[di] = rgba[si] ?? 0;
+      raw[di + 1] = rgba[si + 1] ?? 0;
+      raw[di + 2] = rgba[si + 2] ?? 0;
+      raw[di + 3] = rgba[si + 3] ?? 0;
     }
   }
 
@@ -331,13 +410,13 @@ function encodePng({ width, height, rgba }) {
   ]);
 }
 
-function writePng(filePath, frame) {
+function writePng(filePath: string, frame: Frame): void {
   writeFileSync(filePath, encodePng(frame));
 }
 
 // --- resize ------------------------------------------------------------------
 
-function sampleBilinear(rgba, width, height, fx, fy) {
+function sampleBilinear(rgba: Uint8Array, width: number, height: number, fx: number, fy: number): Rgba {
   const x = Math.max(0, Math.min(width - 1.001, fx));
   const y = Math.max(0, Math.min(height - 1.001, fy));
   const x0 = Math.floor(x);
@@ -351,13 +430,13 @@ function sampleBilinear(rgba, width, height, fx, fy) {
   const i10 = (y0 * width + x1) * 4;
   const i01 = (y1 * width + x0) * 4;
   const i11 = (y1 * width + x1) * 4;
-  const out = [0, 0, 0, 0];
+  const out: Rgba = [0, 0, 0, 0];
 
   for (let c = 0; c < 4; c++) {
-    const v00 = rgba[i00 + c];
-    const v10 = rgba[i10 + c];
-    const v01 = rgba[i01 + c];
-    const v11 = rgba[i11 + c];
+    const v00 = rgba[i00 + c] ?? 0;
+    const v10 = rgba[i10 + c] ?? 0;
+    const v01 = rgba[i01 + c] ?? 0;
+    const v11 = rgba[i11 + c] ?? 0;
     const top = v00 + (v10 - v00) * tx;
     const bot = v01 + (v11 - v01) * tx;
     out[c] = Math.round(top + (bot - top) * ty);
@@ -365,7 +444,7 @@ function sampleBilinear(rgba, width, height, fx, fy) {
   return out;
 }
 
-function resize(frame, newSize) {
+function resize(frame: Frame, newSize: number): Frame {
   const { width, height, rgba } = frame;
   const out = new Uint8Array(newSize * newSize * 4);
   const xRatio = width / newSize;
@@ -389,7 +468,7 @@ function resize(frame, newSize) {
 
 // --- ICO ---------------------------------------------------------------------
 
-function writeIco(filePath, pngBuffers) {
+function writeIco(filePath: string, pngBuffers: { width: number; height: number; png: Buffer }[]): void {
   const count = pngBuffers.length;
   let offset = 6 + count * 16;
   const header = Buffer.alloc(6);
@@ -397,8 +476,8 @@ function writeIco(filePath, pngBuffers) {
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(count, 4);
 
-  const entries = [];
-  const blobs = [];
+  const entries: Buffer[] = [];
+  const blobs: Buffer[] = [];
 
   for (const { width, height, png } of pngBuffers) {
     const entry = Buffer.alloc(16);
@@ -421,7 +500,7 @@ function writeIco(filePath, pngBuffers) {
 // --- web favicons (tight crop — tab icons look larger) -----------------------
 
 /** Square viewBox around squircle + shadow; drops excess transparent padding. */
-function faviconViewBox(spec) {
+function faviconViewBox(spec: IconSpec): { x: number; y: number; size: number } {
   const { squircle, shadow } = spec;
   const pad = 20;
   const top = squircle.cy - squircle.hh - pad;
@@ -436,7 +515,11 @@ function faviconViewBox(spec) {
   };
 }
 
-function cropFrame(frame, box, designSize) {
+function cropFrame(
+  frame: Frame,
+  box: { x: number; y: number; size: number },
+  designSize: number,
+): Frame {
   const scale = frame.width / designSize;
   const x0 = Math.max(0, Math.floor(box.x * scale));
   const y0 = Math.max(0, Math.floor(box.y * scale));
@@ -447,17 +530,17 @@ function cropFrame(frame, box, designSize) {
     for (let x = 0; x < s; x++) {
       const si = ((y0 + y) * frame.width + (x0 + x)) * 4;
       const di = (y * s + x) * 4;
-      out[di] = frame.rgba[si];
-      out[di + 1] = frame.rgba[si + 1];
-      out[di + 2] = frame.rgba[si + 2];
-      out[di + 3] = frame.rgba[si + 3];
+      out[di] = frame.rgba[si] ?? 0;
+      out[di + 1] = frame.rgba[si + 1] ?? 0;
+      out[di + 2] = frame.rgba[si + 2] ?? 0;
+      out[di + 3] = frame.rgba[si + 3] ?? 0;
     }
   }
 
   return { width: s, height: s, rgba: out };
 }
 
-function writeFaviconSvg(spec) {
+function writeFaviconSvg(spec: IconSpec): void {
   const box = faviconViewBox(spec);
   const outPath = path.join(resourcesDir, "favicon.svg");
   const svg = readFileSync(svgPath, "utf8").replace(
@@ -467,7 +550,7 @@ function writeFaviconSvg(spec) {
   writeFileSync(outPath, svg);
 }
 
-function buildWebFavicons(master, spec) {
+function buildWebFavicons(master: Frame, spec: IconSpec): void {
   const cropped = cropFrame(master, faviconViewBox(spec), spec.size);
   const faviconIcoPath = path.join(resourcesDir, "favicon.ico");
   const webIcoSizes = [16, 32, 48];
@@ -482,7 +565,7 @@ function buildWebFavicons(master, spec) {
 
 // --- outputs -----------------------------------------------------------------
 
-function buildIconset(master, designSize) {
+function buildIconset(master: Frame, designSize: number): void {
   mkdirSync(iconsetDir, { recursive: true });
   for (const [name, size] of iconsetSizes) {
     const frame = size === designSize ? master : resize(master, size);
@@ -499,13 +582,14 @@ function buildIcns() {
     });
     return true;
   } catch (error) {
+    const err = error as { stderr?: Buffer; message?: string };
     console.warn("Skipping icon.icns (iconutil failed — run on macOS outside a sandbox):");
-    console.warn(error.stderr?.toString() || error.message);
+    console.warn(err.stderr?.toString() || err.message);
     return false;
   }
 }
 
-function buildIco(master, designSize) {
+function buildIco(master: Frame, designSize: number): void {
   const images = icoSizes.map((size) => {
     const frame = size === designSize ? master : resize(master, size);
     const png = encodePng(frame);
@@ -514,7 +598,7 @@ function buildIco(master, designSize) {
   writeIco(path.join(resourcesDir, "icon.ico"), images);
 }
 
-function main() {
+function main(): void {
   console.log("Parsing", svgPath);
   const spec = parseIconSvg(svgPath);
 
@@ -556,7 +640,7 @@ function main() {
     master.rgba.at(-2),
     master.rgba.at(-1),
   ];
-  if (corners.some((a) => a > 8)) {
+  if (corners.some((a) => (a ?? 0) > 8)) {
     console.warn("Warning: corner pixels may not be fully transparent");
   }
 

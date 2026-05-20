@@ -1,10 +1,10 @@
-import { spawn, spawnSync } from "node:child_process";
-import { watch } from "node:fs";
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import * as Timers from "node:timers/promises";
 
-import { desktopDir, resolveElectronPath } from "./electron-launcher.mjs";
-import { waitForResources } from "./wait-for-resources.mjs";
+import { desktopDir, resolveElectronPath } from "./electron-launcher.ts";
+import { waitForResources } from "./wait-for-resources.ts";
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
 if (!devServerUrl) {
@@ -30,14 +30,14 @@ delete childEnv.ELECTRON_RUN_AS_NODE;
 let shuttingDown = false;
 let stopping = false;
 let launcherReady = false;
-let restartTimer = null;
-let currentApp = null;
-let restartQueue = Promise.resolve();
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
+let currentApp: ChildProcess | null = null;
+let restartQueue: Promise<void> = Promise.resolve();
 let lastBundleWriteAt = Date.now();
-const expectedExits = new WeakSet();
-const watchers = [];
+const expectedExits = new WeakSet<ChildProcess>();
+const watchers: FSWatcher[] = [];
 
-function killOrphanedDevInstances() {
+function killOrphanedDevInstances(): void {
   if (process.platform === "win32") {
     return;
   }
@@ -46,7 +46,7 @@ function killOrphanedDevInstances() {
   spawnSync("pkill", ["-f", marker], { stdio: "ignore" });
 }
 
-function signalAppShutdown(app) {
+function signalAppShutdown(app: ChildProcess): void {
   const pid = app.pid;
   if (!pid) {
     return;
@@ -64,7 +64,7 @@ function signalAppShutdown(app) {
   app.kill("SIGTERM");
 }
 
-function signalAppForceKill(app) {
+function signalAppForceKill(app: ChildProcess): void {
   const pid = app.pid;
   if (!pid) {
     return;
@@ -82,12 +82,12 @@ function signalAppForceKill(app) {
   app.kill("SIGKILL");
 }
 
-function startApp() {
+function startApp(): void {
   if (shuttingDown || stopping || currentApp !== null) {
     return;
   }
 
-  const spawnOptions = {
+  const spawnOptions: SpawnOptions = {
     cwd: desktopDir,
     env: childEnv,
     stdio: "inherit",
@@ -121,7 +121,7 @@ function startApp() {
   });
 }
 
-async function stopApp() {
+async function stopApp(): Promise<void> {
   const app = currentApp;
   if (!app) {
     return;
@@ -131,7 +131,7 @@ async function stopApp() {
   currentApp = null;
   expectedExits.add(app);
 
-  await new Promise((resolve) => {
+  await new Promise<void>((resolve) => {
     let settled = false;
 
     const finish = () => {
@@ -162,7 +162,7 @@ async function stopApp() {
   stopping = false;
 }
 
-function scheduleRestart() {
+function scheduleRestart(): void {
   if (shuttingDown || !launcherReady) {
     return;
   }
@@ -184,7 +184,7 @@ function scheduleRestart() {
   }, restartDebounceMs);
 }
 
-function startWatchers() {
+function startWatchers(): void {
   const watcher = watch(join(desktopDir, "dist-electron"), { persistent: true }, (_eventType, filename) => {
     if (typeof filename !== "string" || !restartWatchFiles.has(filename)) {
       return;
@@ -196,13 +196,13 @@ function startWatchers() {
   watchers.push(watcher);
 }
 
-async function waitForInitialBundleQuiet() {
+async function waitForInitialBundleQuiet(): Promise<void> {
   while (Date.now() - lastBundleWriteAt < initialBundleQuietMs) {
     await Timers.setTimeout(50);
   }
 }
 
-async function shutdown(exitCode) {
+async function shutdown(exitCode: number): Promise<void> {
   if (shuttingDown) {
     return;
   }

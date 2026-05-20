@@ -9,13 +9,13 @@
   "scripts": {
     "dev": "bun run --parallel dev:bundle dev:electron",
     "dev:bundle": "tsdown --watch",
-    "dev:electron": "node scripts/dev-electron.mjs",
-    "dev:kill": "node scripts/kill-dev-electron.mjs",
+    "dev:electron": "bun scripts/dev-electron.ts",
+    "dev:kill": "bun scripts/kill-dev-electron.ts",
     "build": "tsdown",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "start": "node scripts/start-electron.mjs",
+    "start": "bun scripts/start-electron.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
