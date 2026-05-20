@@ -84,7 +84,12 @@ export interface RecorderRemoteState {
   readonly armedSourceId: string | null;
 }
 
-export type RecorderRemoteCommand = "start" | "stop" | "show-main" | "pick-area";
+export type RecorderRemoteCommand =
+  | "start"
+  | "stop"
+  | "show-main"
+  | "pick-area"
+  | "hide-control-bar";
 
 declare global {
   interface Window {

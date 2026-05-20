@@ -353,7 +353,7 @@ function loadControlWidgetPage(window: BrowserWindow): void {
 
 function createControlWidgetWindow(): BrowserWindow {
   const window = new BrowserWindow({
-    width: 240,
+    width: 272,
     height: 88,
     frame: false,
     transparent: true,
@@ -487,6 +487,14 @@ function showMainAfterCaptureSession(focus = true): void {
   }
 }
 
+function hideControlWidget(): void {
+  hudVisiblePreference = false;
+  if (controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
+    controlWidgetWindow.hide();
+  }
+  void refreshTrayMenu();
+}
+
 function toggleControlWidget(): void {
   if (!controlWidgetWindow || controlWidgetWindow.isDestroyed()) {
     hudVisiblePreference = true;
@@ -495,8 +503,7 @@ function toggleControlWidget(): void {
   }
 
   if (controlWidgetWindow.isVisible()) {
-    hudVisiblePreference = false;
-    controlWidgetWindow.hide();
+    hideControlWidget();
   } else {
     hudVisiblePreference = true;
     showFloatingHud(controlWidgetWindow);
@@ -549,6 +556,11 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
   ipcMain.on(IpcChannels.RECORDER_COMMAND_CHANNEL, (_event, command: RecorderRemoteCommand) => {
     if (command === "show-main") {
       showMainWindow();
+      return;
+    }
+
+    if (command === "hide-control-bar") {
+      hideControlWidget();
       return;
     }
 

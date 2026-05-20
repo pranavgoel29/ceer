@@ -1,4 +1,4 @@
-import { RecordIcon, StopIcon, AppWindowIcon } from "@phosphor-icons/react";
+import { AppWindowIcon, EyeSlashIcon, RecordIcon, StopIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import type { RecorderRemoteState } from "@ceer/contracts";
@@ -61,7 +61,7 @@ export function ControlWidgetPage() {
   const isStopping = state.phase === "stopping";
   const statusText = controlWidgetStatusText(state, isStopping, isRecording);
 
-  const send = (command: "start" | "stop" | "show-main") => {
+  const send = (command: "start" | "stop" | "show-main" | "hide-control-bar") => {
     getControlWidgetBridge()?.sendRecorderCommand(command);
   };
 
@@ -81,6 +81,15 @@ export function ControlWidgetPage() {
       </div>
 
       <div className="ceer-control-widget-no-drag flex shrink-0 gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Hide control bar"
+          onClick={() => send("hide-control-bar")}
+        >
+          <EyeSlashIcon className="size-4" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
