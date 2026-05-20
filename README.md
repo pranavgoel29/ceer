@@ -5,41 +5,158 @@
 <h1 align="center">Ceer</h1>
 
 <p align="center">
-  Desktop screen recorder — capture screens, windows, or a custom region, mix mic and system audio, then export.
+  Screen recorder for desktop and browser — capture screens, windows, or a custom region, mix mic and system audio, then export.
 </p>
 
 ## Features
 
-- **Capture targets** — full display, individual windows, or a draggable **area** on screen (fullscreen overlay picker)
-- **Audio mix** — toggle **system audio** (desktop loopback) and **microphone** independently before recording
-- **Live preview** — arm a source, verify video and audio, then record
-- **Recording** — in-app `MediaRecorder` to WebM (VP9/VP8 + Opus)
-- **Export** — transcode to **MP4**, **MOV**, or WebM at **source**, **720p**, **1080p**, or **1440p** ([mediabunny](https://github.com/nickdesaulniers/mediabunny))
-- **Packaging** — macOS `.dmg` and Windows NSIS installer via electron-builder
+| | **Desktop** (`bun run dev`) | **Browser** (`bun run dev:web`) |
+|---|---------------------------|--------------------------------|
+| Capture | Source grid, optional **area crop** | Browser **share picker** (tab / window / screen) |
+| System audio | macOS loopback via Electron | Shared tab audio when the browser provides it (Chrome); often none on Firefox/Zen for window/screen |
+| Microphone | Mixed in renderer | Optional; attach after share |
+| Export | MP4, MOV, WebM at multiple resolutions | Same |
+
+Shared everywhere:
+
+- **Live preview** — arm or share a target, verify framing and audio, then record
+- **Recording** — `MediaRecorder` → WebM (VP9/VP8 + Opus)
+- **Export** — transcode with [mediabunny](https://github.com/nickdesaulniers/mediabunny)
+- **Packaging** — macOS `.dmg` and Windows NSIS installer (desktop app only)
 
 ### Platform notes
 
-- **System audio** on macOS requires **macOS 13+** and **Screen Recording** permission; loopback is most reliable for **screen** capture (window-only capture may have no audio).
-- **Microphone** uses the browser `getUserMedia` path; grant mic access in System Settings when prompted.
-- **Browser mode** (`bun run dev:web`) — record via the browser share picker; mic + export work; no source grid, area crop, or macOS loopback.
-- **Desktop mode** (`bun run dev`) — full feature set via the Electron shell.
+**Desktop (Electron)**
+
+- **System audio** on macOS needs **macOS 13+** and **Screen Recording** permission. Loopback is most reliable for **full screen** capture; window-only capture may have no audio.
+- **Microphone** uses `getUserMedia`; grant access in System Settings when prompted.
+- **Area crop** opens a fullscreen overlay (`area-picker`) to drag a region on the chosen display.
+
+**Browser**
+
+- Requires a **secure context** (`https://` or `localhost`).
+- **Chrome / Edge** — pick a tab and enable “Share tab audio” in the dialog for system sound.
+- **Firefox / Zen** — picker offers window or entire screen only (no tab list). Shared audio is usually unavailable; use **Mic** for narration. UI copy is browser-specific via `capture-platform.ts`.
+
+## Recording flows
+
+### Desktop
+
+1. Pick a **screen** or **window** in the left sidebar (`SourcePicker`), or **snip a region** on a display.
+2. Electron main resolves the source and handles `getDisplayMedia` via `desktopCapturer`.
+3. Preview arms (`phase: armed`) — mix system audio + mic in the renderer (`audio-mix.ts`), optional crop (`crop-video-stream.ts`).
+4. **Roll tape** → WebM chunks → stop → export or download master.
+
+### Browser
+
+1. Click **Share screen, window, or tab** (`WebCapturePanel`) — native picker opens (`previewLoading` while waiting).
+2. Preview goes live (`phase: armed`); optional mic attach; record stream is pre-built before start (Firefox needs a synchronous `MediaRecorder.start()`).
+3. **Roll tape** → stop → export. Informational banners (e.g. missing tab audio) appear once at the top of the shell, not duplicated in the sidebar.
+
+Platform is chosen automatically: if `window.desktopBridge` exists (Electron preload), the app runs in **desktop** mode; otherwise **web**.
+
+## Recorder architecture (UI)
+
+One React tree, two capture backends, shared chrome.
+
+```mermaid
+flowchart TB
+  subgraph entry [Entry]
+    App["recorder-app.tsx"]
+    Bridge["useDesktopBridge()"]
+    Plat["getCapturePlatform()"]
+    Ctx["RecorderPlatformProvider"]
+  end
+
+  subgraph content [Platform content]
+    Desktop["DesktopRecorderContent\nuseDesktopRecorder()"]
+    Web["WebRecorderContent\nuseWebRecorder()"]
+  end
+
+  subgraph shell [Shared UI]
+    Shell["RecorderShell"]
+    Stage["RecordStage"]
+    Controls["RecordControls"]
+    Header["RecorderHeader"]
+  end
+
+  subgraph sidebars [Sidebar slot]
+    Picker["SourcePicker"]
+    Share["WebCapturePanel"]
+  end
+
+  App --> Bridge --> Plat --> Ctx
+  Ctx --> Desktop
+  Ctx --> Web
+  Desktop --> Shell
+  Web --> Shell
+  Shell --> Header
+  Shell --> Stage
+  Shell --> Controls
+  Desktop --> Picker
+  Web --> Share
+```
+
+| Layer | Role |
+|-------|------|
+| `recorder-app.tsx` | Entry; platform branch; desktop source/area state |
+| `recorder-shell.tsx` | Layout, errors, web `shareAudioNotice` banner, `canRecord` / toggle disabled |
+| `recorder-platform-context.tsx` | `useIsWebRecorder()` for stage, controls, header |
+| `use-desktop-recorder.ts` | Arm preview, audio remix, desktop `MediaRecorder` |
+| `use-web-recorder.ts` | Share picker, mic attach, pre-warmed record stream |
+| `use-recorder.ts` | Optional `RecorderApi` facade (prefer platform hooks in UI) |
+| `recorder-api.ts` | Shared types: `RecorderCore`, `canArm`, discriminated union |
+| `capture-platform.ts` | Platform detection, Firefox checks, share copy |
+| `recorder-media.ts` | Display capture, Web Audio mux, codec selection, recorder start/stop |
+| `recorder-session.ts` | `prepareRecordStream`, `finalizeChunks` |
+| `audio-mix.ts` | Desktop-only preview/record audio mix |
+| `recorder-types.ts` | `RecorderPhase`, `RecordingResult` |
+
+Phases are aligned across platforms: `idle` → `armed` → `recording` → `stopping` → `stopped`. Web uses `previewLoading` during the share picker while `phase` stays `idle`.
+
+## Architecture (media pipeline)
+
+```mermaid
+flowchart LR
+  subgraph renderer [apps/web renderer]
+    UI[RecorderShell + hooks]
+    Mix[audio-mix / recorder-media]
+    MR[MediaRecorder]
+    UI --> Mix --> MR
+    MR --> Export[mediabunny export]
+  end
+
+  subgraph main [apps/desktop main]
+    DM[setDisplayMediaRequestHandler]
+    DC[desktopCapturer]
+    DM --> DC
+  end
+
+  UI -->|getDisplayMedia| DM
+  UI -->|getUserMedia mic| Mic[Microphone]
+```
+
+- **Desktop video** — `getDisplayMedia` in main via `desktopCapturer` and the selected `CaptureSourceRef`.
+- **Desktop system audio** — Electron `audio: "loopback"` when enabled (macOS 13+).
+- **Web video/audio** — Browser `getDisplayMedia` with Chrome `systemAudio` or Firefox `audio: true`; multi-track mux only when needed (`recorder-media.ts`).
+- **Area crop** — Canvas crop on the mixed preview stream before record (desktop only).
 
 ## Stack
 
 - **Bun** workspaces + install
 - **Turbo** task orchestration
 - **`apps/desktop`** — Electron main, preload, area-picker window; bundled with **tsdown**
-- **`apps/web`** — React recorder UI via **Vite** (not electron-vite)
-- **`packages/contracts`** — shared TypeScript types for preload IPC
+- **`apps/web`** — React recorder UI via **Vite**
+- **`packages/contracts`** — shared TypeScript types for preload IPC (`DesktopBridge`, capture refs)
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) 1.2+
-- macOS or Windows for distributable builds
+- macOS or Windows for distributable desktop builds
 
 ### Package manager
 
-This repo uses **Bun** (`bun.lock`, `node_modules/.bun`). If you see a `.pnpm-store` folder at the repo root, it was created incidentally (for example by `bunx shadcn` or a one-off `pnpm` run). It is safe to delete and is gitignored — it is not part of the normal Bun install.
+This repo uses **Bun** (`bun.lock`, `node_modules/.bun`). A `.pnpm-store` folder at the repo root, if present, is incidental and gitignored — safe to delete.
 
 ## Develop
 
@@ -50,27 +167,27 @@ bun install
 bun run dev
 ```
 
-This starts:
+Starts:
 
 1. Vite (`@ceer/web`) on `http://localhost:5173`
 2. `tsdown --watch` for Electron main, preload, and area-picker preload
 3. Electron loading the Vite dev server (single instance; restarts when main/preload bundles change)
 
-Override the host or port:
+Override host or port:
 
 ```bash
 PORT=5174 HOST=127.0.0.1 bun run dev
 ```
 
-Run the web UI in a browser (screen capture via the browser picker — use **Chrome** or **Edge** for best results):
+**Browser-only UI** (no Electron bridge — web capture path):
 
 ```bash
 bun run dev:web
 ```
 
-Open `http://localhost:5173`, click **Share screen or window**, allow permissions, then record and export. Requires `localhost` or `https://` (secure context).
+Open `http://localhost:5173`, share a target, then record and export.
 
-Desktop-only dev (same as `bun run dev` but scoped to desktop + web packages):
+**Desktop-scoped dev** (same as `bun run dev`, filtered packages):
 
 ```bash
 bun run dev:desktop
@@ -78,26 +195,20 @@ bun run dev:desktop
 
 ### Stuck or multiple dock icons?
 
-If dev restarts leave several **Ceer (Dev)** icons in the dock, quit them or run:
-
 ```bash
 bun run dev:kill
 ```
 
-Then start dev again. Only one Electron instance should run; launching dev while the app is open focuses the existing window.
+Then `bun run dev` again. Only one Electron instance should run.
 
 ### Electron failed to install correctly
-
-Bun does not run Electron’s download script unless the package is trusted. This repo sets `trustedDependencies: ["electron"]` and runs `scripts/ensure-electron.mjs` on `postinstall`.
-
-If desktop dev still fails:
 
 ```bash
 bun run setup:electron
 bun run dev
 ```
 
-Or reinstall from scratch:
+Or clean reinstall:
 
 ```bash
 rm -rf node_modules apps/*/node_modules
@@ -110,7 +221,7 @@ bun install
 bun run build
 ```
 
-Run the desktop app against the built web assets:
+Run the desktop app against built web assets:
 
 ```bash
 cd apps/desktop && bun run start
@@ -124,70 +235,62 @@ bun run typecheck
 
 ## Package installers
 
-Build web + desktop, then run [electron-builder](https://www.electron.build/) from `apps/desktop`.
-
-Stop `bun run dev` first — a running dev watcher can slow or interrupt the production build.
+Stop `bun run dev` before production builds.
 
 ```bash
 # macOS → apps/desktop/release/*.dmg
 bun run dist:mac
 
-# Windows → apps/desktop/release/*.exe (NSIS installer)
+# Windows → apps/desktop/release/*.exe (NSIS)
 bun run dist:win
 ```
 
-Config: `apps/desktop/electron-builder.yml`. Packaged UI is served from `process.resourcesPath/web/` (see `resolve-renderer.ts` and `main.ts`).
+Config: `apps/desktop/electron-builder.yml`. Packaged UI is served from `process.resourcesPath/web/` (`resolve-renderer.ts`, `main.ts`). Icons: `apps/desktop/resources/`.
 
-App icons live in `apps/desktop/resources/` (`icon.svg`, `icon.png`, `icon.icns`, `icon.ico`).
-
-## Layout
+## Repository layout
 
 ```
 ceer/
 ├── apps/
 │   ├── desktop/
 │   │   ├── src/
-│   │   │   ├── main.ts                 # Window, display-media handler, IPC
-│   │   │   ├── preload.ts              # desktopBridge
-│   │   │   ├── area-picker.ts          # Region overlay window
+│   │   │   ├── main.ts              # Window, display-media handler, IPC
+│   │   │   ├── preload.ts           # desktopBridge
+│   │   │   ├── area-picker.ts       # Region overlay window
 │   │   │   ├── resolve-capture-source.ts
-│   │   │   └── resolve-renderer.ts     # Production index.html path
-│   │   ├── scripts/
-│   │   │   ├── dev-electron.mjs        # Watch bundles, spawn/restart Electron
-│   │   │   └── kill-dev-electron.mjs
-│   │   └── resources/                  # Icons for app + dock
+│   │   │   └── resolve-renderer.ts
+│   │   └── resources/               # App icons
 │   └── web/
 │       └── src/
-│           ├── components/recorder/     # Recorder UI
-│           └── hooks/                  # Capture, export, sources
-├── packages/
-│   └── contracts/                      # DesktopBridge + IPC channel types
+│           ├── components/recorder/
+│           │   ├── recorder-app.tsx           # Entry + platform branch
+│           │   ├── recorder-shell.tsx         # Shared layout
+│           │   ├── recorder-platform-context.tsx
+│           │   ├── source-picker.tsx          # Desktop sidebar
+│           │   ├── web-capture-panel.tsx      # Browser sidebar
+│           │   ├── record-stage.tsx
+│           │   ├── record-controls.tsx
+│           │   ├── recorder-header.tsx
+│           │   └── area-picker-page.tsx
+│           ├── hooks/
+│           │   ├── use-desktop-recorder.ts
+│           │   ├── use-web-recorder.ts
+│           │   ├── use-recorder.ts
+│           │   ├── recorder-api.ts
+│           │   ├── recorder-types.ts
+│           │   ├── use-desktop-bridge.ts
+│           │   ├── use-desktop-sources.ts
+│           │   └── use-recording-export.ts
+│           └── lib/
+│               ├── capture-platform.ts
+│               ├── recorder-media.ts
+│               ├── recorder-session.ts
+│               ├── audio-mix.ts
+│               ├── crop-video-stream.ts
+│               └── export-recording.ts
+├── packages/contracts/              # IPC + capture types
 ├── scripts/
-│   ├── dev.mjs                         # Sets VITE_DEV_SERVER_URL, runs turbo dev
+│   ├── dev.mjs
 │   └── ensure-electron.mjs
-├── turbo.json
 └── package.json
 ```
-
-## Architecture (recording)
-
-```mermaid
-flowchart LR
-  subgraph renderer [apps/web]
-    UI[Recorder UI]
-    MR[MediaRecorder]
-    UI --> MR
-  end
-  subgraph main [apps/desktop]
-    DM[setDisplayMediaRequestHandler]
-    DC[desktopCapturer]
-    DM --> DC
-  end
-  UI -->|getDisplayMedia + getUserMedia| DM
-  MR -->|WebM blob| Export[mediabunny export]
-```
-
-- **Video** — `navigator.mediaDevices.getDisplayMedia` handled in main via `desktopCapturer` and the selected source ref.
-- **System audio** — Electron `audio: "loopback"` when the system-audio toggle is on (macOS 13+).
-- **Microphone** — separate `getUserMedia` stream, mixed in the renderer (`audio-mix.ts`).
-- **Area crop** — optional region from the area-picker overlay; video cropped on a canvas stream before preview/record.
