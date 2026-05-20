@@ -5,6 +5,10 @@
   "workspaces": {
     "packages": ["apps/*", "packages/*"]
   },
+  "engines": {
+    "node": ">=22.18.0",
+    "bun": ">=1.2.0"
+  },
   "scripts": {
     "postinstall": "bun scripts/ensure-electron.ts",
     "dev": "bun scripts/dev.ts",
@@ -12,6 +16,8 @@
     "dev:desktop": "bun scripts/dev.ts desktop",
     "dev:kill": "bun run --cwd apps/desktop dev:kill",
     "build": "turbo run build",
+    "dist:prepare": "bun run --cwd apps/desktop dist:prepare",
+    "dist:unlock": "bun run --cwd apps/desktop dist:unlock",
     "dist:mac": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:mac",
     "dist:win": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:win",
     "typecheck": "turbo run typecheck && bun run typecheck:scripts",

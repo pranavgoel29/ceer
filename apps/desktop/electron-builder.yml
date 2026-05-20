@@ -1,9 +1,11 @@
 appId: com.ceer.app
 productName: Ceer
 copyright: Copyright © 2026
+electronVersion: "35.7.5"
+npmRebuild: false
 
 directories:
-  output: release
+  output: dist-out
   buildResources: resources
 
 files:
@@ -18,6 +20,8 @@ extraResources:
       - "**/*"
   - from: resources/icon.png
     to: icon.png
+  - from: resources/icon.ico
+    to: icon.ico
 
 asar: true
 
@@ -34,6 +38,9 @@ win:
   icon: resources/icon.ico
   target:
     - nsis
+  sign: false
+  # Embed icon + version metadata via rcedit; signing is skipped when no certificate is configured.
+  signAndEditExecutable: true
 
 nsis:
   oneClick: false

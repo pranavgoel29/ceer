@@ -24,10 +24,11 @@ function resolvePreloadPath(): string {
 }
 
 function resolveAppIconPath(): string {
+  const iconFile = process.platform === "win32" ? "icon.ico" : "icon.png";
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, "icon.png");
+    return path.join(process.resourcesPath, iconFile);
   }
-  return path.join(__dirname, "../resources/icon.png");
+  return path.join(__dirname, "../resources", iconFile);
 }
 
 async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
@@ -149,6 +150,10 @@ function registerIpcHandlers(): void {
 }
 
 app.setName(appName);
+
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.ceer.app");
+}
 
 if (hasSingleInstanceLock) {
   app.on("second-instance", () => {

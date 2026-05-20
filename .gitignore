@@ -4,6 +4,8 @@ node_modules
 dist
 dist-electron
 release
+dist-out
+dist-release
 .electron-runtime
 *.log
 .DS_Store

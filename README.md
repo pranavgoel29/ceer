@@ -244,17 +244,28 @@ Outputs `icon.png`, `icon.icns`, `icon.ico`, `icon.iconset/`, plus web-only `fav
 
 ## Package installers
 
-Stop `bun run dev` before production builds.
+Requires **Node ≥ 22.18** and **Bun**. Stop `bun run dev` before building.
+
+From the repo root (builds web + desktop, then runs [electron-builder](https://www.electron.build/win)):
 
 ```bash
-# macOS → apps/desktop/release/*.dmg
-bun run dist:mac
-
-# Windows → apps/desktop/release/*.exe (NSIS)
+# Windows NSIS installer → apps/desktop/dist-out/*.exe
 bun run dist:win
+
+# macOS DMG → apps/desktop/dist-out/*.dmg
+bun run dist:mac
 ```
 
-Config: `apps/desktop/electron-builder.yml`. Packaged UI is served from `process.resourcesPath/web/` (`resolve-renderer.ts`, `main.ts`). Icons: `apps/desktop/resources/`.
+Desktop-only packaging (after `bun run build`):
+
+```bash
+cd apps/desktop
+bun run dist:win   # or dist:mac
+```
+
+Quit any **Ceer** window opened from `dist-out/win-unpacked` before rebuilding (`bun run dev:kill`).
+
+Config: `apps/desktop/electron-builder.yml` (`electronVersion`, `win.target: nsis`, unsigned local builds via `sign: false`). Packaged UI is served from `process.resourcesPath/web/`.
 
 ## Repository layout
 

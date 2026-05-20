@@ -8,22 +8,22 @@
   "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "dev:bundle": "tsdown --watch --config-loader native",
+    "dev:bundle": "tsdown --watch",
     "dev:electron": "bun scripts/dev-electron.ts",
     "dev:kill": "bun scripts/kill-dev-electron.ts",
-    "build": "tsdown --config-loader native",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
+    "build": "tsdown",
+    "dist:prepare": "bun scripts/prepare-dist.ts",
+    "dist:unlock": "bun scripts/prepare-dist.ts",
+    "dist": "bun run dist:prepare && electron-builder",
+    "dist:mac": "bun run dist:prepare && electron-builder --mac",
+    "dist:win": "bun run dist:prepare && electron-builder --win",
     "start": "bun scripts/start-electron.ts",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@ceer/contracts": "workspace:*"
-  },
   "devDependencies": {
+    "@ceer/contracts": "workspace:*",
     "@types/node": "^22.15.0",
-    "electron": "^35.1.2",
+    "electron": "35.7.5",
     "electron-builder": "^25.1.8",
     "tsdown": "^0.22.0",
     "typescript": "^5.8.3"
