@@ -418,6 +418,68 @@ function writeIco(filePath, pngBuffers) {
   writeFileSync(filePath, Buffer.concat([header, ...entries, ...blobs]));
 }
 
+// --- web favicons (tight crop — tab icons look larger) -----------------------
+
+/** Square viewBox around squircle + shadow; drops excess transparent padding. */
+function faviconViewBox(spec) {
+  const { squircle, shadow } = spec;
+  const pad = 20;
+  const top = squircle.cy - squircle.hh - pad;
+  const bottom = squircle.cy + squircle.hh + shadow.dy + shadow.blur + pad;
+  const left = squircle.cx - squircle.hw - shadow.blur - pad;
+  const right = squircle.cx + squircle.hw + shadow.blur + pad;
+  const size = Math.max(right - left, bottom - top);
+  return {
+    x: squircle.cx - size / 2,
+    y: squircle.cy - size / 2,
+    size,
+  };
+}
+
+function cropFrame(frame, box, designSize) {
+  const scale = frame.width / designSize;
+  const x0 = Math.max(0, Math.floor(box.x * scale));
+  const y0 = Math.max(0, Math.floor(box.y * scale));
+  const s = Math.min(frame.width - x0, frame.height - y0, Math.round(box.size * scale));
+  const out = new Uint8Array(s * s * 4);
+
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const si = ((y0 + y) * frame.width + (x0 + x)) * 4;
+      const di = (y * s + x) * 4;
+      out[di] = frame.rgba[si];
+      out[di + 1] = frame.rgba[si + 1];
+      out[di + 2] = frame.rgba[si + 2];
+      out[di + 3] = frame.rgba[si + 3];
+    }
+  }
+
+  return { width: s, height: s, rgba: out };
+}
+
+function writeFaviconSvg(spec) {
+  const box = faviconViewBox(spec);
+  const outPath = path.join(resourcesDir, "favicon.svg");
+  const svg = readFileSync(svgPath, "utf8").replace(
+    /viewBox=["'][^"']*["']/,
+    `viewBox="${Math.round(box.x)} ${Math.round(box.y)} ${Math.round(box.size)} ${Math.round(box.size)}"`,
+  );
+  writeFileSync(outPath, svg);
+}
+
+function buildWebFavicons(master, spec) {
+  const cropped = cropFrame(master, faviconViewBox(spec), spec.size);
+  const faviconIcoPath = path.join(resourcesDir, "favicon.ico");
+  const webIcoSizes = [16, 32, 48];
+  const images = webIcoSizes.map((size) => {
+    const frame = resize(cropped, size);
+    return { width: size, height: size, png: encodePng(frame) };
+  });
+  writeIco(faviconIcoPath, images);
+  writePng(path.join(resourcesDir, "favicon-32.png"), resize(cropped, 32));
+  writePng(path.join(resourcesDir, "favicon-192.png"), resize(cropped, 192));
+}
+
 // --- outputs -----------------------------------------------------------------
 
 function buildIconset(master, designSize) {
@@ -476,6 +538,13 @@ function main() {
 
   buildIco(master, spec.size);
   console.log("  ", path.join(resourcesDir, "icon.ico"));
+
+  writeFaviconSvg(spec);
+  console.log("  ", path.join(resourcesDir, "favicon.svg"));
+  buildWebFavicons(master, spec);
+  console.log("  ", path.join(resourcesDir, "favicon.ico"));
+  console.log("  ", path.join(resourcesDir, "favicon-32.png"));
+  console.log("  ", path.join(resourcesDir, "favicon-192.png"));
 
   const corners = [
     master.rgba[0],

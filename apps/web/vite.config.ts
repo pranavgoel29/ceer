@@ -12,8 +12,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const iconDir = path.resolve(__dirname, "../desktop/resources");
 
 const iconRoutes: Record<string, { file: string; type: string }> = {
-  "/favicon.ico": { file: "icon.ico", type: "image/x-icon" },
-  "/favicon.svg": { file: "icon.svg", type: "image/svg+xml" },
+  "/favicon.ico": { file: "favicon.ico", type: "image/x-icon" },
+  "/favicon.svg": { file: "favicon.svg", type: "image/svg+xml" },
+  "/favicon-32.png": { file: "favicon-32.png", type: "image/png" },
+  "/favicon-192.png": { file: "favicon-192.png", type: "image/png" },
 };
 
 function ceerAppIcons(): Plugin {
@@ -41,8 +43,10 @@ function ceerAppIcons(): Plugin {
     closeBundle() {
       const outDir = path.resolve(__dirname, "dist");
       const copies: Array<[string, string]> = [
-        ["icon.ico", "favicon.ico"],
-        ["icon.svg", "favicon.svg"],
+        ["favicon.ico", "favicon.ico"],
+        ["favicon.svg", "favicon.svg"],
+        ["favicon-32.png", "favicon-32.png"],
+        ["favicon-192.png", "favicon-192.png"],
       ];
       for (const [sourceName, destName] of copies) {
         const source = path.join(iconDir, sourceName);

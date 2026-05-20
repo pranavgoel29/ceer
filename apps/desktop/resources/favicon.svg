@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="72 72 880 880">
+  <defs>
+    <linearGradient id="coral" x1="188" y1="134" x2="820" y2="892" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgb(255 111 74)"/>
+      <stop offset="1" stop-color="rgb(209 91 60)"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="126" y="126" width="772" height="772" rx="214" fill="url(#coral)" filter="url(#softShadow)"/>
+  <circle cx="512" cy="512" r="168" fill="#ffffff"/>
+  <circle cx="512" cy="512" r="136" fill="url(#coral)"/>
+  <circle cx="512" cy="512" r="106" fill="#ffffff"/>
+</svg>
