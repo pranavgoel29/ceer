@@ -1,5 +1,6 @@
 import { RecordIcon } from "@phosphor-icons/react";
 
+import { ThemeToggle } from "~/components/theme-toggle";
 import { Badge } from "~/components/ui/badge";
 import type { RecorderPhase } from "~/hooks/recorder-types";
 import { cn } from "~/lib/utils";
@@ -23,11 +24,13 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/50 pb-5">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="ceer-header-icon ceer-wobble inline-flex size-11 shrink-0 items-center justify-center rounded-2xl text-background shadow-lg">
+        <span className="ceer-header-icon ceer-wobble inline-flex size-11 shrink-0 items-center justify-center rounded-2xl shadow-lg">
           <RecordIcon className="size-5" weight="fill" />
         </span>
         <div className="min-w-0 space-y-1">
-          <p className="font-heading text-[10px] tracking-[0.35em] text-ceer-lime uppercase">Ceer</p>
+          <p className="font-heading text-[10px] tracking-[0.35em] text-ceer-lime-accent uppercase">
+            Ceer
+          </p>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Pixel trap</h1>
           <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
             {recorderSubtitle(platform)}
@@ -36,6 +39,7 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <ThemeToggle />
         {isWeb ? (
           <Badge variant="outline" className="font-mono text-[10px] tracking-wide uppercase">
             Browser

@@ -7,9 +7,16 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    /* Brand */
+    /* Brand: --ceer-lime = fills/highlights; --ceer-lime-accent = borders/icons on light UI;
+       --ceer-lime-foreground = small text where accent would be too faint */
     --ceer-lime: oklch(0.88 0.19 120);
+    --ceer-lime-foreground: oklch(0.5 0.17 120);
+    --ceer-lime-accent: oklch(0.58 0.18 120);
+    --ceer-lime-surface-accent: oklch(0.88 0.19 120 / 18%);
     --ceer-coral: oklch(0.72 0.19 35);
+    --ceer-coral-foreground: oklch(0.5 0.17 35);
+    --ceer-logo-foreground: oklch(1 0 0);
+    --ceer-on-lime: oklch(0.18 0.03 120);
     --overlay: oklch(0 0 0);
     --warning: oklch(0.78 0.14 75);
     --warning-foreground: oklch(0.28 0.05 75);
@@ -17,12 +24,12 @@
     /* Recorder UI tokens (light) — static oklch, no runtime color-mix */
     --ceer-lime-glow: oklch(0.88 0.19 120 / 6%);
     --ceer-lime-ring: oklch(0.88 0.19 120 / 20%);
-    --ceer-lime-border-subtle: oklch(0.88 0.19 120 / 25%);
-    --ceer-lime-border: oklch(0.88 0.19 120 / 30%);
-    --ceer-lime-border-strong: oklch(0.88 0.19 120 / 35%);
-    --ceer-lime-surface-subtle: oklch(0.88 0.19 120 / 5%);
-    --ceer-lime-surface: oklch(0.88 0.19 120 / 10%);
-    --ceer-lime-surface-strong: oklch(0.88 0.19 120 / 15%);
+    --ceer-lime-border-subtle: oklch(0.88 0.19 120 / 35%);
+    --ceer-lime-border: oklch(0.88 0.19 120 / 45%);
+    --ceer-lime-border-strong: oklch(0.88 0.19 120 / 55%);
+    --ceer-lime-surface-subtle: oklch(0.88 0.19 120 / 10%);
+    --ceer-lime-surface: oklch(0.88 0.19 120 / 16%);
+    --ceer-lime-surface-strong: oklch(0.88 0.19 120 / 22%);
     --ceer-coral-border-hover: oklch(0.72 0.19 35 / 40%);
     --ceer-coral-hover: oklch(0.72 0.19 35 / 90%);
     --ceer-video-surface: oklch(0 0 0 / 70%);
@@ -91,6 +98,10 @@
 }
 
 .dark {
+    --ceer-lime-foreground: oklch(0.88 0.19 120);
+    --ceer-lime-accent: oklch(0.82 0.17 120);
+    --ceer-lime-surface-accent: oklch(0.88 0.19 120 / 12%);
+    --ceer-coral-foreground: oklch(0.72 0.19 35);
     --warning-foreground: oklch(0.95 0.03 95);
     --ceer-panel-border: oklch(0.42 0.06 120);
     --ceer-panel-bg: oklch(0.216 0.006 56.043 / 88%);
@@ -139,7 +150,12 @@
     --font-sans: 'Outfit Variable', sans-serif;
     --font-heading: 'Geist Mono Variable', monospace;
     --color-ceer-lime: var(--ceer-lime);
+    --color-ceer-lime-foreground: var(--ceer-lime-foreground);
+    --color-ceer-lime-accent: var(--ceer-lime-accent);
     --color-ceer-coral: var(--ceer-coral);
+    --color-ceer-coral-foreground: var(--ceer-coral-foreground);
+    --color-ceer-logo-foreground: var(--ceer-logo-foreground);
+    --color-ceer-on-lime: var(--ceer-on-lime);
     --color-overlay: var(--overlay);
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
@@ -373,9 +389,9 @@
   }
 
   .ceer-icon-well {
-    border: 1px solid var(--ceer-lime-border);
-    background: var(--ceer-lime-surface);
-    color: var(--ceer-lime);
+    border: 1px solid var(--ceer-lime-accent);
+    background: var(--ceer-lime-surface-accent);
+    color: var(--ceer-lime-accent);
   }
 
   .ceer-region-badge {
@@ -391,13 +407,13 @@
   }
 
   .ceer-accent-surface {
-    border: 1px solid var(--ceer-lime-border-subtle);
-    background: var(--ceer-lime-surface-subtle);
+    border: 1px solid var(--ceer-lime-accent);
+    background: var(--ceer-lime-surface-accent);
   }
 
   .ceer-accent-surface-strong {
-    border: 1px dashed var(--ceer-lime-border-subtle);
-    background: var(--ceer-lime-surface-subtle);
+    border: 1.5px dashed var(--ceer-lime-accent);
+    background: var(--ceer-lime-surface-accent);
   }
 
   .ceer-source-selected {
@@ -411,11 +427,12 @@
   }
 
   .ceer-export-panel {
-    border: 1px solid var(--ceer-lime-border-subtle);
-    background: var(--ceer-lime-surface-subtle);
+    border: 1px solid var(--ceer-lime-accent);
+    background: var(--ceer-lime-surface-accent);
   }
 
   .ceer-header-icon {
+    color: var(--ceer-logo-foreground);
     background: linear-gradient(
       to bottom right,
       var(--ceer-coral),
@@ -425,14 +442,14 @@
   }
 
   .ceer-phase-armed {
-    border-color: var(--ceer-phase-armed-border);
-    background: var(--ceer-lime-surface);
-    color: var(--ceer-lime);
+    border-color: var(--ceer-lime-accent);
+    background: var(--ceer-lime-surface-accent);
+    color: var(--ceer-lime-accent);
   }
 
   .ceer-icon-well--strong {
     border: none;
-    background: var(--ceer-lime-surface-strong);
+    background: var(--ceer-lime-surface-accent);
   }
 
   .ceer-record-btn {
@@ -459,7 +476,7 @@
   }
 
   .ceer-border-lime {
-    border-color: var(--ceer-lime-border);
+    border-color: var(--ceer-lime-accent);
   }
 
   .ceer-thumbnail-frame {

@@ -9,7 +9,7 @@
     </filter>
   </defs>
   <rect x="126" y="126" width="772" height="772" rx="214" fill="url(#coral)" filter="url(#softShadow)"/>
-  <circle cx="512" cy="512" r="168" fill="rgb(22 18 17)"/>
+  <circle cx="512" cy="512" r="168" fill="#ffffff"/>
   <circle cx="512" cy="512" r="136" fill="url(#coral)"/>
-  <circle cx="512" cy="512" r="106" fill="rgb(22 18 17)"/>
+  <circle cx="512" cy="512" r="106" fill="#ffffff"/>
 </svg>

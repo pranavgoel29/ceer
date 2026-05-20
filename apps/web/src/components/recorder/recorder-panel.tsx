@@ -16,8 +16,8 @@ interface RecorderPanelProps {
 }
 
 const accentText = {
-  lime: "text-ceer-lime",
-  coral: "text-ceer-coral",
+  lime: "text-ceer-lime-accent",
+  coral: "text-ceer-coral-foreground",
 } as const;
 
 const tiltClass = {

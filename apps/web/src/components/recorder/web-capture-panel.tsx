@@ -46,7 +46,7 @@ export function WebCapturePanel({
 
       <div className="flex flex-col gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
         <div className="flex items-start gap-2">
-          <MonitorIcon className="mt-0.5 size-4 shrink-0 text-ceer-lime" weight="duotone" />
+          <MonitorIcon className="mt-0.5 size-4 shrink-0 text-ceer-lime-accent" weight="duotone" />
           <p>{sharePickerHint()}</p>
         </div>
       </div>

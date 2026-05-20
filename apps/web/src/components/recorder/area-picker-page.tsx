@@ -220,7 +220,7 @@ function SelectionBox({ rect }: { rect: DragRect }) {
         height: rect.height,
       }}
     >
-      <span className="absolute -top-7 left-0 rounded-md bg-ceer-lime px-2 py-0.5 font-mono text-[11px] text-background">
+      <span className="absolute -top-7 left-0 rounded-md bg-ceer-lime px-2 py-0.5 font-mono text-[11px] text-ceer-on-lime">
         {Math.round(rect.width)} × {Math.round(rect.height)}
       </span>
       {HANDLE_POSITIONS.map((handle) => (

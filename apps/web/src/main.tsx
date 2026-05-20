@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 
 import { App } from "./App.tsx";
+import { initTheme } from "./lib/theme.ts";
 import { AreaPickerPage } from "./components/recorder/area-picker-page.tsx";
 
 const root = document.getElementById("root");
@@ -12,6 +13,8 @@ if (!root) {
 }
 
 const mode = new URLSearchParams(window.location.search).get("mode");
+
+initTheme();
 
 createRoot(root).render(
   <StrictMode>

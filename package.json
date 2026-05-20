@@ -15,7 +15,8 @@
     "dist:mac": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:mac",
     "dist:win": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:win",
     "typecheck": "turbo run typecheck",
-    "setup:electron": "node scripts/ensure-electron.mjs"
+    "setup:electron": "node scripts/ensure-electron.mjs",
+    "generate:icons": "node scripts/generate-icons.mjs"
   },
   "trustedDependencies": ["electron"],
   "devDependencies": {

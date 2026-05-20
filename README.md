@@ -232,6 +232,16 @@ Typecheck all packages:
 bun run typecheck
 ```
 
+### App icons
+
+Edit `apps/desktop/resources/icon.svg`, then regenerate raster assets (desktop dock/installer + web favicons):
+
+```bash
+bun run generate:icons
+```
+
+Outputs `icon.png` (transparent corners), `icon.icns`, `icon.ico`, and `icon.iconset/`. `scripts/generate-icons.mjs` parses `icon.svg` and rasterizes it in pure Node (no npm deps); `.icns` uses macOS `iconutil`. Vite copies/serves the SVG and ICO from `apps/desktop/resources/` for the web app.
+
 ## Package installers
 
 Stop `bun run dev` before production builds.
@@ -258,7 +268,7 @@ ceer/
 │   │   │   ├── area-picker.ts       # Region overlay window
 │   │   │   ├── resolve-capture-source.ts
 │   │   │   └── resolve-renderer.ts
-│   │   └── resources/               # App icons
+│   │   └── resources/               # icon.svg (source) + generated png/icns/ico
 │   └── web/
 │       └── src/
 │           ├── components/recorder/
