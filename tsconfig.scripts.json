@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ESNext"],
-    "types": ["bun-types", "node"]
-  },
-  "include": ["scripts/**/*.ts", "apps/desktop/scripts/**/*.ts", "apps/desktop/scripts/lib/**/*.ts"]
-}

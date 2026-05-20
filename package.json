@@ -19,8 +19,7 @@
     "dist:prepare": "bun run --cwd apps/desktop dist:prepare",
     "dist:mac": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:mac",
     "dist:win": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:win",
-    "typecheck": "turbo run typecheck && bun run typecheck:scripts",
-    "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "setup:electron": "bun scripts/ensure-electron.ts",
     "generate:icons": "bun scripts/generate-icons.ts"
   },

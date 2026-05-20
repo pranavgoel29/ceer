@@ -15,8 +15,7 @@
     "dist": "bun run dist:prepare && electron-builder",
     "dist:mac": "bun run dist:prepare && electron-builder --mac",
     "dist:win": "bun run dist:prepare && electron-builder --win",
-    "start": "bun scripts/run-electron.ts",
-    "typecheck": "tsc --noEmit"
+    "start": "bun scripts/run-electron.ts"
   },
   "devDependencies": {
     "@ceer/contracts": "workspace:*",

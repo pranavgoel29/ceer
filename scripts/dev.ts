@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runChildren } from "./lib/run-children.ts";
+import { runChildren } from "./lib/run-children";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const webDir = join(repoRoot, "apps/web");

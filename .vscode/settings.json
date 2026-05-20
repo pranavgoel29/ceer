@@ -1,4 +1,5 @@
 {
+  "typescript.tsconfig": "tsconfig.json",
   "snyk.advanced.autoSelectOrganization": true,
   "files.associations": {
     "*.css": "tailwindcss"

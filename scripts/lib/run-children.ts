@@ -1,6 +1,6 @@
-import type { Subprocess } from "bun";
+type SpawnedChild = ReturnType<typeof Bun.spawn>;
 
-export async function runChildren(children: Subprocess[]): Promise<void> {
+export async function runChildren(children: SpawnedChild[]): Promise<void> {
   let shuttingDown = false;
 
   function killChildren(): void {
