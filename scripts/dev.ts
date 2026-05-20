@@ -1,11 +1,9 @@
-import { spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const port = process.env.PORT ?? "5173";
 const host = process.env.HOST?.trim() || "localhost";
-const viteDevServerUrl = `http://${host}:${port}`;
+
+process.env.PORT = port;
+process.env.HOST = host;
+process.env.VITE_DEV_SERVER_URL = `http://${host}:${port}`;
 
 const mode = process.argv[2];
 const filters =
@@ -13,21 +11,19 @@ const filters =
     ? ["--filter=@ceer/desktop", "--filter=@ceer/web"]
     : ["--filter=@ceer/web", "--filter=@ceer/desktop"];
 
-const child = spawn("bun", ["run", "turbo", "run", "dev", ...filters, "--parallel"], {
-  cwd: repoRoot,
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    PORT: port,
-    HOST: host,
-    VITE_DEV_SERVER_URL: viteDevServerUrl,
-  },
+const bun = Bun.which("bun");
+if (!bun) {
+  throw new Error("Could not find bun on PATH.");
+}
+
+const child = Bun.spawn({
+  cmd: [bun, "x", "turbo", "run", "dev", ...filters],
+  cwd: import.meta.dirname + "/..",
+  env: process.env,
+  stdin: "inherit",
+  stdout: "inherit",
+  stderr: "inherit",
 });
 
-child.on("exit", (code, signal) => {
-  if (signal) {
-    process.kill(process.pid, signal);
-    return;
-  }
-  process.exit(code ?? 0);
-});
+const exitCode = await child.exited;
+process.exit(exitCode);

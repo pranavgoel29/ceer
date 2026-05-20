@@ -22,6 +22,7 @@
   "trustedDependencies": ["electron"],
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "bun-types": "^1.3.14",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },

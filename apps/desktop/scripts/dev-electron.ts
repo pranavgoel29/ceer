@@ -224,7 +224,6 @@ async function shutdown(exitCode: number): Promise<void> {
 }
 
 killOrphanedDevInstances();
-startWatchers();
 
 await waitForResources({
   baseDir: desktopDir,
@@ -233,7 +232,9 @@ await waitForResources({
   tcpPort: port,
 });
 
+lastBundleWriteAt = Date.now();
 await waitForInitialBundleQuiet();
+startWatchers();
 launcherReady = true;
 startApp();
 
