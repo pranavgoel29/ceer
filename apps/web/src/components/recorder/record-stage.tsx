@@ -113,7 +113,7 @@ export function RecordStage({
         )}
 
         {previewLoading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-background/55 to-background/75 p-8 text-center backdrop-blur-[2px]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-b from-background/55 to-background/75 p-8 text-center backdrop-blur-[2px]">
             <span className="flex size-14 items-center justify-center rounded-2xl border border-ceer-lime/30 bg-ceer-lime/10 text-ceer-lime shadow-sm">
               <SpinnerIcon className="size-7 animate-spin" />
             </span>
@@ -123,7 +123,7 @@ export function RecordStage({
             </div>
           </div>
         ) : !isLive && !showPlayback ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-background/50 to-background/70 p-8 text-center backdrop-blur-[1px]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-b from-background/50 to-background/70 p-8 text-center backdrop-blur-[1px]">
             <span className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-muted-foreground shadow-sm">
               <FilmSlateIcon className="size-7" weight="duotone" />
             </span>

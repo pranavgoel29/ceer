@@ -23,7 +23,7 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/50 pb-5">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="ceer-wobble inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-ceer-coral to-ceer-coral/80 text-background shadow-lg shadow-ceer-coral/25">
+        <span className="ceer-wobble inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-ceer-coral to-ceer-coral/80 text-background shadow-lg shadow-ceer-coral/25">
           <RecordIcon className="size-5" weight="fill" />
         </span>
         <div className="min-w-0 space-y-1">
