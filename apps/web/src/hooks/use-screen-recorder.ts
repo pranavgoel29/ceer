@@ -173,9 +173,8 @@ export function useScreenRecorder() {
         }
 
         const audioStreams: MediaStream[] = [];
-        const wantsSystemAudioNow = systemAudioEnabledRef.current;
 
-        if (!wantsSystemAudioNow) {
+        if (!systemAudioEnabledRef.current) {
           for (const track of displayStream.getAudioTracks()) {
             displayStream.removeTrack(track);
             track.stop();
@@ -184,7 +183,7 @@ export function useScreenRecorder() {
           const systemTracks = displayStream.getAudioTracks();
           if (systemTracks.length > 0) {
             audioStreams.push(new MediaStream(systemTracks));
-          } else {
+          } else if (isActiveArm(armGeneration)) {
             setError(
               "System audio unavailable. On macOS you need 13+ and Screen Recording permission; window-only capture may have no audio.",
             );

@@ -3,9 +3,15 @@ export async function attachAudioToVideoStream(
   videoStream: MediaStream,
   audioStreams: MediaStream[],
 ): Promise<{ stream: MediaStream; cleanup: () => void }> {
+  const tracksToAttach = new Set(audioStreams.flatMap((stream) => stream.getAudioTracks()));
+
   for (const track of videoStream.getAudioTracks()) {
     videoStream.removeTrack(track);
-    track.stop();
+    // Display-capture loopback tracks are often the same objects passed in audioStreams;
+    // stopping them here would silence system audio when re-attaching or mixing.
+    if (!tracksToAttach.has(track)) {
+      track.stop();
+    }
   }
 
   if (audioStreams.length === 0) {
@@ -14,7 +20,9 @@ export async function attachAudioToVideoStream(
 
   if (audioStreams.length === 1) {
     for (const track of audioStreams[0]!.getAudioTracks()) {
-      videoStream.addTrack(track);
+      if (!videoStream.getAudioTracks().includes(track)) {
+        videoStream.addTrack(track);
+      }
     }
     return { stream: videoStream, cleanup: () => undefined };
   }

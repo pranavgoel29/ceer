@@ -8,10 +8,10 @@ const desktopBridge: DesktopBridge = {
   ping: () => ipcRenderer.invoke(IpcChannels.PING_CHANNEL),
   getDesktopSources: () => ipcRenderer.invoke(IpcChannels.GET_DESKTOP_SOURCES_CHANNEL),
   setCaptureSource: (source: CaptureSourceRef | null) => {
-    ipcRenderer.send(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, source);
+    ipcRenderer.sendSync(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, source);
   },
   setCapturePreferences: (preferences) => {
-    ipcRenderer.send(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, preferences);
+    ipcRenderer.sendSync(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, preferences);
   },
   requestMicrophoneAccess: () =>
     ipcRenderer.invoke(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL),

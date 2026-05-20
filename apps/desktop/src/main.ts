@@ -113,14 +113,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.GET_DESKTOP_SOURCES_CHANNEL, () => listDesktopSources());
 
-  ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (_event, source: CaptureSourceRef | null) => {
+  ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (event, source: CaptureSourceRef | null) => {
     selectedCaptureSource = source;
+    event.returnValue = null;
   });
 
-  ipcMain.on(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, (_event, preferences: CapturePreferences) => {
+  ipcMain.on(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, (event, preferences: CapturePreferences) => {
     capturePreferences = {
       systemAudioEnabled: Boolean(preferences.systemAudioEnabled),
     };
+    event.returnValue = null;
   });
 
   ipcMain.handle(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL, async () => {
