@@ -104,6 +104,21 @@ export function sharePanelDescription(): string {
   return "Pick a screen, window, or tab in your browser's dialog.";
 }
 
+/** Empty-stage hint when no preview is active. */
+export function stageIdleHint(platform: CapturePlatform): string {
+  if (isWeb(platform)) {
+    return "Share a screen, window, or tab to see a live preview here.";
+  }
+  return "Select a screen or window on the left, or snip a custom region.";
+}
+
+export function recorderSubtitle(platform: CapturePlatform): string {
+  if (isWeb(platform)) {
+    return "Share a screen, window, or tab in your browser — then roll tape and export.";
+  }
+  return "Capture screens, windows, or a custom region — then roll tape and export.";
+}
+
 export const WEB_SYSTEM_AUDIO_HINT =
   "Mutes shared audio when present. Firefox/Zen: window/screen only — use Mic for sound.";
 

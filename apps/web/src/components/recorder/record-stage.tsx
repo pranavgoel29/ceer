@@ -6,9 +6,9 @@ import { Badge } from "~/components/ui/badge";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import type { RecorderPhase } from "~/hooks/recorder-types";
 import { formatDuration } from "~/lib/format";
-import { sharePanelDescription } from "~/lib/capture-platform";
+import { stageIdleHint } from "~/lib/capture-platform";
 import { cn } from "~/lib/utils";
-import { useIsWebRecorder } from "~/components/recorder/recorder-platform-context";
+import { useRecorderPlatform } from "~/components/recorder/recorder-platform-context";
 
 interface RecordStageProps {
   readonly phase: RecorderPhase;
@@ -57,7 +57,7 @@ export function RecordStage({
   captureRegion,
 }: RecordStageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const isWeb = useIsWebRecorder();
+  const platform = useRecorderPlatform();
 
   useEffect(() => {
     const node = videoRef.current;
@@ -130,9 +130,7 @@ export function RecordStage({
             <div className="max-w-xs space-y-1">
               <p className="text-sm font-medium">No signal yet</p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                {isWeb
-                  ? sharePanelDescription()
-                  : "Select a screen or window on the left, or snip a custom region."}
+                {stageIdleHint(platform)}
               </p>
             </div>
           </div>

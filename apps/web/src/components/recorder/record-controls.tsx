@@ -24,7 +24,7 @@ import { Switch } from "~/components/ui/switch";
 import { useRecordingExport } from "~/hooks/use-recording-export";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
 import { DESKTOP_SYSTEM_AUDIO_HINT, WEB_SYSTEM_AUDIO_HINT } from "~/lib/capture-platform";
-import { useIsWebRecorder } from "~/components/recorder/recorder-platform-context";
+import { useRecorderPlatformContext } from "~/components/recorder/recorder-platform-context";
 import { formatBytes, formatDuration } from "~/lib/format";
 import {
   EXPORT_FORMATS,
@@ -244,7 +244,7 @@ export function RecordControls(props: RecordControlsProps) {
   const isActiveCapture = isRecording || isStopping;
   const isStopped = phase === "stopped" && recording !== null;
   const togglesDisabled = togglesDisabledProp || isActiveCapture;
-  const isWeb = useIsWebRecorder();
+  const { isWeb } = useRecorderPlatformContext();
 
   return (
     <RecorderPanel

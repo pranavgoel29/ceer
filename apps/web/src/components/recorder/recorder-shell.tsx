@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import { RecordControls } from "~/components/recorder/record-controls";
 import { RecordStage } from "~/components/recorder/record-stage";
 import { RecorderHeader } from "~/components/recorder/recorder-header";
+import { useRecorderPlatformContext } from "~/components/recorder/recorder-platform-context";
 import type { RecorderApi } from "~/hooks/recorder-api";
-import { isWebRecorderApi } from "~/hooks/recorder-api";
+import { isDesktopRecorderApi, isWebRecorderApi } from "~/hooks/recorder-api";
 
 const SHELL_CHROME = (
   <>
@@ -30,8 +31,10 @@ export function RecorderShell({
   onMicChange,
   onSystemAudioChange,
 }: RecorderShellProps) {
+  const { isWeb, isDesktop } = useRecorderPlatformContext();
   const combinedError = sourcesError ?? recorder.error;
-  const shareAudioNotice = isWebRecorderApi(recorder) ? recorder.shareAudioNotice : null;
+  const shareAudioNotice =
+    isWeb && isWebRecorderApi(recorder) ? recorder.shareAudioNotice : null;
 
   const isActiveCapture =
     recorder.phase === "recording" || recorder.phase === "stopping";
@@ -76,7 +79,9 @@ export function RecorderShell({
                 recordingUrl={recorder.recording?.url ?? null}
                 elapsedMs={recorder.elapsedMs}
                 captureRegion={
-                  recorder.platform === "desktop" ? recorder.captureRegion : null
+                  isDesktop && isDesktopRecorderApi(recorder)
+                    ? recorder.captureRegion
+                    : null
                 }
               />
             </main>

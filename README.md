@@ -101,10 +101,9 @@ flowchart TB
 |-------|------|
 | `recorder-app.tsx` | Entry; platform branch; desktop source/area state |
 | `recorder-shell.tsx` | Layout, errors, web `shareAudioNotice` banner, `canRecord` / toggle disabled |
-| `recorder-platform-context.tsx` | `useIsWebRecorder()` for stage, controls, header |
+| `recorder-platform-context.tsx` | `RecorderPlatformProvider`; `useRecorderPlatformContext()` / `useIsWebRecorder()` / `useIsDesktopRecorder()` for shared UI (throws outside provider) |
 | `use-desktop-recorder.ts` | Arm preview, audio remix, desktop `MediaRecorder` |
 | `use-web-recorder.ts` | Share picker, mic attach, pre-warmed record stream |
-| `use-recorder.ts` | Optional `RecorderApi` facade (prefer platform hooks in UI) |
 | `recorder-api.ts` | Shared types: `RecorderCore`, `canArm`, discriminated union |
 | `capture-platform.ts` | Platform detection, Firefox checks, share copy |
 | `recorder-media.ts` | Display capture, Web Audio mux, codec selection, recorder start/stop |
@@ -275,7 +274,6 @@ ceer/
 │           ├── hooks/
 │           │   ├── use-desktop-recorder.ts
 │           │   ├── use-web-recorder.ts
-│           │   ├── use-recorder.ts
 │           │   ├── recorder-api.ts
 │           │   ├── recorder-types.ts
 │           │   ├── use-desktop-bridge.ts
