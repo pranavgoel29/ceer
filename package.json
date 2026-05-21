@@ -20,6 +20,12 @@
     "dist:prepare": "bun run --cwd apps/desktop dist:prepare",
     "dist:mac": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:mac",
     "dist:win": "turbo run build --filter=@ceer/web --filter=@ceer/desktop && bun run --cwd apps/desktop dist:win",
+    "dist:desktop:artifact": "bun scripts/build-desktop-artifact.ts",
+    "dist:desktop:dmg": "bun scripts/build-desktop-artifact.ts --platform mac --target dmg",
+    "dist:desktop:dmg:arm64": "bun scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64",
+    "dist:desktop:dmg:x64": "bun scripts/build-desktop-artifact.ts --platform mac --target dmg --arch x64",
+    "dist:desktop:win": "bun scripts/build-desktop-artifact.ts --platform win --target nsis",
+    "dist:desktop:win:x64": "bun scripts/build-desktop-artifact.ts --platform win --target nsis --arch x64",
     "typecheck": "tsc --noEmit",
     "setup:electron": "bun scripts/ensure-electron.ts",
     "generate:icons": "bun scripts/generate-icons.ts"
