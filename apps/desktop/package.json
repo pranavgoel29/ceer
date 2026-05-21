@@ -4,6 +4,10 @@
   "description": "Ceer desktop screen recorder",
   "author": "Pranav Goel",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pranavgoel29/ceer.git"
+  },
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",

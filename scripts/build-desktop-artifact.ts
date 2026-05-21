@@ -147,6 +147,8 @@ const buildEnv: NodeJS.ProcessEnv = {
 const electronBuilderArgs = [
   "bunx",
   "electron-builder",
+  "--projectDir",
+  desktopDir,
   platformConfig.cliFlag,
   target,
   `--${arch}`,
@@ -167,7 +169,7 @@ console.log(
 );
 
 await runCommandAsync(electronBuilderArgs, {
-  cwd: desktopDir,
+  cwd: repoRoot,
   env: buildEnv,
 });
 
