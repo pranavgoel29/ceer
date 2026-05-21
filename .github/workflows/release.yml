@@ -88,12 +88,12 @@ jobs:
           - label: macOS arm64
             runner: macos-latest
             platform: mac
-            target: "dmg zip"
+            target: dmg
             arch: arm64
           - label: macOS x64
             runner: macos-latest
             platform: mac
-            target: "dmg zip"
+            target: dmg
             arch: x64
           - label: Windows x64
             runner: windows-latest
@@ -123,15 +123,18 @@ jobs:
         run: bun scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
 
       - name: Build desktop artifact
+        shell: bash
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: >
-          bun run dist:desktop:artifact --
-          --platform ${{ matrix.platform }}
-          --target ${{ matrix.target }}
-          --arch ${{ matrix.arch }}
-          --build-version ${{ needs.preflight.outputs.version }}
-          --verbose
+        run: |
+          args=(
+            --platform "${{ matrix.platform }}"
+            --target "${{ matrix.target }}"
+            --arch "${{ matrix.arch }}"
+            --build-version "${{ needs.preflight.outputs.version }}"
+            --verbose
+          )
+          bun run dist:desktop:artifact -- "${args[@]}"
 
       - name: Collect release assets
         shell: bash

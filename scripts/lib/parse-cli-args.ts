@@ -1,3 +1,6 @@
+/** Flags that accept multiple space-separated values before the next `--flag`. */
+const MULTI_VALUE_KEYS = new Set(["target"]);
+
 export function parseCliArgs(argv: string[]): Map<string, string | boolean> {
   const parsed = new Map<string, string | boolean>();
 
@@ -8,6 +11,28 @@ export function parseCliArgs(argv: string[]): Map<string, string | boolean> {
     }
 
     const key = token.slice(2);
+
+    if (MULTI_VALUE_KEYS.has(key)) {
+      const values: string[] = [];
+      let valueIndex = index + 1;
+      while (valueIndex < argv.length && !argv[valueIndex]?.startsWith("--")) {
+        const value = argv[valueIndex];
+        if (value) {
+          values.push(value);
+        }
+        valueIndex += 1;
+      }
+
+      if (values.length === 0) {
+        parsed.set(key, true);
+      } else {
+        parsed.set(key, values.join(" "));
+      }
+
+      index = valueIndex - 1;
+      continue;
+    }
+
     const next = argv[index + 1];
     if (!next || next.startsWith("--")) {
       parsed.set(key, true);
