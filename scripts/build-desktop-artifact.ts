@@ -149,8 +149,6 @@ const buildEnv: NodeJS.ProcessEnv =
 const electronBuilderArgs = [
   "bunx",
   "electron-builder",
-  "--projectDir",
-  desktopDir,
   platformConfig.cliFlag,
   target,
   `--${arch}`,
@@ -170,8 +168,9 @@ console.log(
   `[desktop-artifact] Building ${platform}/${target} (arch=${arch}, version=${buildVersion ?? "package.json"})...`,
 );
 
+// Run from apps/desktop so electron-builder resolves hooks (afterPack) and paths correctly.
 await runCommandAsync(electronBuilderArgs, {
-  cwd: repoRoot,
+  cwd: desktopDir,
   env: buildEnv,
 });
 
