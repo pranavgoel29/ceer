@@ -32,9 +32,18 @@ extraResources:
 
 asar: true
 
+# Ad-hoc sign macOS bundles when no Apple Developer cert (CSC_*) is configured.
+afterPack: scripts/after-pack-adhoc-sign.cjs
+
 mac:
   category: public.app-category.video
   icon: resources/icon.icns
+  # electron-builder 25 treats identity "-" as a keychain name; ad-hoc sign runs in afterPack instead.
+  identity: null
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.inherit.plist
   target:
     - dmg
     - zip
