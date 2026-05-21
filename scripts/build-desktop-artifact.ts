@@ -145,9 +145,10 @@ const buildEnv: NodeJS.ProcessEnv = {
 };
 
 const electronBuilderArgs = [
-  "x",
+  "bunx",
   "electron-builder",
   platformConfig.cliFlag,
+  target,
   `--${arch}`,
   "--publish",
   "never",
