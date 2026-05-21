@@ -36,7 +36,6 @@ let controlWidgetWindow: BrowserWindow | null = null;
 let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
-let mainHiddenForCaptureSession = false;
 let controlBarShown = false;
 let appIsActive = true;
 
@@ -294,7 +293,6 @@ function showMainWindow(): void {
     return;
   }
 
-  mainHiddenForCaptureSession = false;
   if (main.isMinimized()) {
     main.restore();
   }
@@ -566,7 +564,6 @@ function hideMainForCaptureSession(): void {
     return;
   }
 
-  mainHiddenForCaptureSession = true;
   if (!main.isVisible()) {
     return;
   }
@@ -580,7 +577,6 @@ function showMainAfterCaptureSession(focus = true): void {
     return;
   }
 
-  mainHiddenForCaptureSession = false;
   if (main.isMinimized()) {
     main.restore();
   }
