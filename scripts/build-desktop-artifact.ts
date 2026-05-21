@@ -105,7 +105,8 @@ if (!platform) {
 }
 
 const platformConfig = PLATFORM_CONFIG[platform];
-const target = getCliString(parsed, "target") ?? platformConfig.defaultTarget;
+const targetInput = getCliString(parsed, "target") ?? platformConfig.defaultTarget;
+const targets = targetInput.split(/\s+/).filter((value) => value.length > 0);
 const archInput = getCliString(parsed, "arch");
 const arch: BuildArch =
   archInput === "arm64" || archInput === "x64" ? archInput : getDefaultArch(platform);
@@ -150,7 +151,7 @@ const electronBuilderArgs = [
   "bunx",
   "electron-builder",
   platformConfig.cliFlag,
-  target,
+  ...targets,
   `--${arch}`,
   "--publish",
   "never",
@@ -165,7 +166,7 @@ if (verbose) {
 }
 
 console.log(
-  `[desktop-artifact] Building ${platform}/${target} (arch=${arch}, version=${buildVersion ?? "package.json"})...`,
+  `[desktop-artifact] Building ${platform}/${targets.join(" ")} (arch=${arch}, version=${buildVersion ?? "package.json"})...`,
 );
 
 // Run from apps/desktop so electron-builder resolves hooks (afterPack) and paths correctly.

@@ -262,6 +262,17 @@ function mergeExtras(
   return merged;
 }
 
+/** electron-updater on macOS requires ZIP; DMG is for manual installs only. */
+export function filterMacAutoUpdateFiles(manifest: UpdateManifest): UpdateManifest {
+  const zipFiles = manifest.files.filter((file) => file.url.toLowerCase().endsWith(".zip"));
+  if (zipFiles.length === 0) {
+    throw new Error(
+      "macOS update manifest must include at least one .zip file for electron-updater.",
+    );
+  }
+  return { ...manifest, files: zipFiles };
+}
+
 export function mergeUpdateManifests(
   primary: UpdateManifest,
   secondary: UpdateManifest,

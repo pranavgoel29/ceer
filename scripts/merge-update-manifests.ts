@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  filterMacAutoUpdateFiles,
   mergeUpdateManifests,
   parseUpdateManifest,
   serializeUpdateManifest,
@@ -26,10 +27,12 @@ const primary = resolve(primaryPath);
 const secondary = resolve(secondaryPath);
 const output = resolve(outputPath ?? primaryPath);
 
-const merged = mergeUpdateManifests(
-  parseUpdateManifest(readFileSync(primary, "utf8"), primary, platformLabel),
-  parseUpdateManifest(readFileSync(secondary, "utf8"), secondary, platformLabel),
-  platformLabel,
+const merged = filterMacAutoUpdateFiles(
+  mergeUpdateManifests(
+    parseUpdateManifest(readFileSync(primary, "utf8"), primary, platformLabel),
+    parseUpdateManifest(readFileSync(secondary, "utf8"), secondary, platformLabel),
+    platformLabel,
+  ),
 );
 
 writeFileSync(output, serializeUpdateManifest(merged, { platformLabel }));
