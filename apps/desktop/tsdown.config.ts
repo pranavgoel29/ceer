@@ -7,7 +7,7 @@ const shared = {
   outExtensions: () => ({ js: ".cjs" }),
   deps: {
     // Must stay external — bundling inlines getElectronPath() and breaks at runtime.
-    neverBundle: ["electron"],
+    neverBundle: ["electron", "electron-updater"],
   },
 };
 

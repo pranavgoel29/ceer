@@ -18,6 +18,9 @@
     "dist:win": "bun run dist:prepare && electron-builder --win",
     "start": "bun scripts/run-electron.ts"
   },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
   "devDependencies": {
     "@ceer/contracts": "workspace:*",
     "@types/node": "^22.15.0",

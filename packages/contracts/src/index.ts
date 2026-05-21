@@ -15,6 +15,31 @@ export interface DesktopBridge {
   readonly onRecorderCommand: (listener: (command: RecorderRemoteCommand) => void) => () => void;
   /** Tray (or main) chose a capture target — arm preview in the renderer. */
   readonly onSelectCaptureSource: (listener: (source: CaptureSourceRef) => void) => () => void;
+  readonly getUpdateState: () => DesktopUpdateState;
+  readonly onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
+  readonly checkForUpdates: () => Promise<void>;
+  readonly downloadUpdate: () => Promise<DesktopUpdateActionResult>;
+  readonly installUpdate: () => Promise<DesktopUpdateActionResult>;
+}
+
+export type DesktopUpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "ready"
+  | "error";
+
+export interface DesktopUpdateState {
+  readonly status: DesktopUpdateStatus;
+  readonly availableVersion?: string;
+  readonly progressPercent?: number;
+  readonly errorMessage?: string;
+}
+
+export interface DesktopUpdateActionResult {
+  readonly ok: boolean;
+  readonly errorMessage?: string;
 }
 
 export interface DesktopAppInfo {

@@ -3,6 +3,11 @@ productName: Ceer
 copyright: Copyright © 2026
 electronVersion: "35.7.5"
 npmRebuild: false
+artifactName: Ceer-${version}-${arch}.${ext}
+
+publish:
+  provider: github
+  releaseType: release
 
 directories:
   output: dist-out
@@ -32,6 +37,7 @@ mac:
   icon: resources/icon.icns
   target:
     - dmg
+    - zip
 
 dmg:
   title: Ceer

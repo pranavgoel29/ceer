@@ -1,6 +1,7 @@
 import { RecordIcon } from "@phosphor-icons/react";
 
 import { ThemeToggle } from "~/components/theme-toggle";
+import { UpdateControls } from "~/components/recorder/update-controls";
 import { Badge } from "~/components/ui/badge";
 import type { RecorderPhase } from "~/hooks/recorder-types";
 import { cn } from "~/lib/utils";
@@ -39,6 +40,7 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <UpdateControls />
         <ThemeToggle />
         {isWeb ? (
           <Badge variant="outline" className="font-mono text-[10px] tracking-wide uppercase">

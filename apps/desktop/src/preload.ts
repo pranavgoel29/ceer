@@ -1,6 +1,7 @@
 import type {
   CaptureSourceRef,
   DesktopBridge,
+  DesktopUpdateState,
   RecorderRemoteCommand,
   RecorderRemoteState,
 } from "@ceer/contracts";
@@ -39,6 +40,17 @@ const desktopBridge: DesktopBridge = {
       ipcRenderer.removeListener(IpcChannels.RECORDER_SELECT_SOURCE_CHANNEL, handler);
     };
   },
+  getUpdateState: () => ipcRenderer.sendSync(IpcChannels.GET_UPDATE_STATE_CHANNEL),
+  onUpdateState: (listener: (state: DesktopUpdateState) => void) => {
+    const handler = (_event: unknown, state: DesktopUpdateState) => listener(state);
+    ipcRenderer.on(IpcChannels.UPDATE_STATE_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.UPDATE_STATE_CHANNEL, handler);
+    };
+  },
+  checkForUpdates: () => ipcRenderer.invoke(IpcChannels.CHECK_FOR_UPDATES_CHANNEL),
+  downloadUpdate: () => ipcRenderer.invoke(IpcChannels.DOWNLOAD_UPDATE_CHANNEL),
+  installUpdate: () => ipcRenderer.invoke(IpcChannels.INSTALL_UPDATE_CHANNEL),
 };
 
 contextBridge.exposeInMainWorld("desktopBridge", desktopBridge);

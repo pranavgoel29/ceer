@@ -13,6 +13,7 @@ import {
   registerRecordingControl,
 } from "./recording-control.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
+import { disposeAppUpdates, registerAppUpdates } from "./updates.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
@@ -139,6 +140,9 @@ function initializeApp(): void {
       selectedCaptureSource = source;
     },
   });
+  if (!isDevelopment) {
+    registerAppUpdates();
+  }
   createMainWindow();
 
   app.on("activate", () => {
@@ -179,5 +183,6 @@ if (hasSingleInstanceLock) {
     isQuitting = true;
     selectedCaptureSource = null;
     capturePreferences = { systemAudioEnabled: true };
+    disposeAppUpdates();
   });
 }

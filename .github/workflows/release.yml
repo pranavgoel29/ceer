@@ -123,6 +123,8 @@ jobs:
         run: bun scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
 
       - name: Build desktop artifact
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: >
           bun run dist:desktop:artifact --
           --platform ${{ matrix.platform }}
@@ -175,6 +177,22 @@ jobs:
           pattern: desktop-*
           merge-multiple: true
           path: release-assets
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Merge macOS updater manifests
+        run: |
+          shopt -s nullglob
+          for x64_manifest in release-assets/*-mac-x64.yml; do
+            arm64_manifest="${x64_manifest%-x64.yml}.yml"
+            if [[ -f "$arm64_manifest" ]]; then
+              bun scripts/merge-update-manifests.ts mac "$arm64_manifest" "$x64_manifest"
+              rm -f "$x64_manifest"
+            fi
+          done
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
