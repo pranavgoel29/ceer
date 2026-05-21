@@ -139,10 +139,12 @@ if (!skipBuild) {
 console.log("[desktop-artifact] Preparing desktop dist...");
 await runCommandAsync([bun, "run", "dist:prepare"], { cwd: desktopDir });
 
-const buildEnv: NodeJS.ProcessEnv = {
-  ...process.env,
-  CSC_IDENTITY_AUTO_DISCOVERY: "false",
-};
+// Match local `dist:mac`: allow electron-builder to ad-hoc sign on macOS runners.
+// Windows stays unsigned (see electron-builder.yml `win.sign: false`).
+const buildEnv: NodeJS.ProcessEnv =
+  platform === "win"
+    ? { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: "false" }
+    : { ...process.env };
 
 const electronBuilderArgs = [
   "bunx",
