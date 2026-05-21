@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { getCliBoolean, getCliString, parseCliArgs } from "./lib/parse-cli-args.ts";
@@ -90,6 +90,41 @@ function copyArtifacts(outputDir: string) {
   }
 }
 
+function isMacUpdateManifest(fileName: string): boolean {
+  return fileName.endsWith(".yml") && fileName.includes("mac");
+}
+
+function backupMacUpdateManifests(backupDir: string): void {
+  mkdirSync(backupDir, { recursive: true });
+  for (const entry of readdirSync(distOutDir)) {
+    if (!isMacUpdateManifest(entry)) {
+      continue;
+    }
+    copyFileSync(join(distOutDir, entry), join(backupDir, entry));
+  }
+}
+
+function restoreMacUpdateManifests(backupDir: string): void {
+  if (!existsSync(backupDir)) {
+    return;
+  }
+
+  for (const entry of readdirSync(backupDir)) {
+    copyFileSync(join(backupDir, entry), join(distOutDir, entry));
+  }
+  rmSync(backupDir, { recursive: true, force: true });
+}
+
+function assertMacZipArtifactsPresent(): void {
+  const zipArtifacts = readdirSync(distOutDir).filter((entry) => entry.toLowerCase().endsWith(".zip"));
+  if (zipArtifacts.length === 0) {
+    console.error(
+      "[desktop-artifact] macOS zip artifact missing. electron-updater requires a .zip build.",
+    );
+    process.exit(1);
+  }
+}
+
 const parsed = parseCliArgs(process.argv.slice(2));
 const platformInput = getCliString(parsed, "platform");
 const platform =
@@ -147,32 +182,57 @@ const buildEnv: NodeJS.ProcessEnv =
     ? { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: "false" }
     : { ...process.env };
 
-const electronBuilderArgs = [
-  "bunx",
-  "electron-builder",
-  platformConfig.cliFlag,
-  ...targets,
-  `--${arch}`,
-  "--publish",
-  "never",
-];
+function createElectronBuilderArgs(macTarget?: string): string[] {
+  const electronBuilderArgs = [
+    "bunx",
+    "electron-builder",
+    platformConfig.cliFlag,
+    ...(macTarget ? [macTarget] : targets),
+    `--${arch}`,
+    "--publish",
+    "never",
+  ];
 
-if (buildVersion) {
-  electronBuilderArgs.push("-c.extraMetadata.version", buildVersion);
+  if (buildVersion) {
+    electronBuilderArgs.push("-c.extraMetadata.version", buildVersion);
+  }
+
+  if (verbose) {
+    electronBuilderArgs.push("--config.compression", "store");
+  }
+
+  return electronBuilderArgs;
 }
 
-if (verbose) {
-  electronBuilderArgs.push("--config.compression", "store");
+async function runElectronBuilder(macTarget?: string): Promise<void> {
+  await runCommandAsync(createElectronBuilderArgs(macTarget), {
+    cwd: desktopDir,
+    env: buildEnv,
+  });
 }
+
+const buildMacZipThenDmg =
+  platform === "mac" && targets.includes("dmg") && targets.includes("zip");
 
 console.log(
   `[desktop-artifact] Building ${platform}/${targets.join(" ")} (arch=${arch}, version=${buildVersion ?? "package.json"})...`,
 );
 
-// Run from apps/desktop so electron-builder resolves hooks (afterPack) and paths correctly.
-await runCommandAsync(electronBuilderArgs, {
-  cwd: desktopDir,
-  env: buildEnv,
-});
+// electron-builder overwrites latest-mac.yml with DMG when both targets run together.
+// Build zip first (updater manifest + .zip), then dmg (installer), then restore zip manifests.
+if (buildMacZipThenDmg) {
+  const manifestBackupDir = join(distOutDir, ".mac-update-manifest-backup");
+
+  console.log("[desktop-artifact] macOS pass 1/2: zip (auto-update)...");
+  await runElectronBuilder("zip");
+  backupMacUpdateManifests(manifestBackupDir);
+
+  console.log("[desktop-artifact] macOS pass 2/2: dmg (installer)...");
+  await runElectronBuilder("dmg");
+  restoreMacUpdateManifests(manifestBackupDir);
+  assertMacZipArtifactsPresent();
+} else {
+  await runElectronBuilder();
+}
 
 copyArtifacts(outputDir);

@@ -266,8 +266,9 @@ function mergeExtras(
 export function filterMacAutoUpdateFiles(manifest: UpdateManifest): UpdateManifest {
   const zipFiles = manifest.files.filter((file) => file.url.toLowerCase().endsWith(".zip"));
   if (zipFiles.length === 0) {
+    const fileList = manifest.files.map((file) => file.url).join(", ") || "(none)";
     throw new Error(
-      "macOS update manifest must include at least one .zip file for electron-updater.",
+      `macOS update manifest must include at least one .zip file for electron-updater. Found: ${fileList}`,
     );
   }
   return { ...manifest, files: zipFiles };

@@ -158,6 +158,15 @@ jobs:
             done
           fi
 
+          if [[ "${{ matrix.platform }}" == "mac" ]]; then
+            shopt -s nullglob
+            zip_assets=(release-publish/*.zip)
+            if [[ ${#zip_assets[@]} -eq 0 ]]; then
+              echo "macOS build did not produce a .zip artifact (required for auto-update)." >&2
+              exit 1
+            fi
+          fi
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -187,6 +196,15 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+
+      - name: Verify macOS auto-update artifacts
+        run: |
+          shopt -s nullglob
+          zip_assets=(release-assets/*.zip)
+          if [[ ${#zip_assets[@]} -eq 0 ]]; then
+            echo "No macOS .zip artifacts found. Auto-update requires zip builds." >&2
+            exit 1
+          fi
 
       - name: Merge macOS updater manifests
         run: |
