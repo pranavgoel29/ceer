@@ -6,7 +6,7 @@ import type { DesktopUpdateActionResult, DesktopUpdateState } from "@ceer/contra
 import * as IpcChannels from "./ipc/channels.ts";
 
 const STARTUP_DELAY_MS = 15_000;
-const POLL_INTERVAL_MS = 4 * 60 * 60_000;
+const POLL_INTERVAL_MS = 30 * 60_000;
 
 const idleState: DesktopUpdateState = { status: "idle" };
 
