@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Ceer desktop screen recorder",
   "author": "Pranav Goel",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",

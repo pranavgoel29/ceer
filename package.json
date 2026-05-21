@@ -1,5 +1,6 @@
 {
   "name": "@ceer/monorepo",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "workspaces": {
