@@ -210,7 +210,6 @@ jobs:
           make_latest: ${{ needs.preflight.outputs.make_latest }}
           files: |
             release-assets/*.dmg
-            release-assets/*.zip
             release-assets/*.exe
             release-assets/*.blockmap
             release-assets/*.yml
