@@ -13,7 +13,7 @@ import {
   registerRecordingControl,
 } from "./recording-control.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
-import { disposeAppUpdates, registerAppUpdates } from "./updates.ts";
+import { disposeAppUpdates, registerAppUpdates, registerUpdateIpcHandlers } from "./updates.ts";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
 const appName = isDevelopment ? "Ceer (Dev)" : "Ceer";
@@ -140,6 +140,7 @@ function initializeApp(): void {
       selectedCaptureSource = source;
     },
   });
+  registerUpdateIpcHandlers();
   if (!isDevelopment) {
     registerAppUpdates();
   }

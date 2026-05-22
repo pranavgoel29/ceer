@@ -58,6 +58,55 @@ async function checkForUpdates(reason: string): Promise<void> {
   }
 }
 
+export function registerUpdateIpcHandlers(): void {
+  ipcMain.on(IpcChannels.GET_UPDATE_STATE_CHANNEL, (event) => {
+    event.returnValue = updateState;
+  });
+
+  ipcMain.handle(IpcChannels.CHECK_FOR_UPDATES_CHANNEL, async () => {
+    await checkForUpdates("manual");
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_UPDATE_CHANNEL, async (): Promise<DesktopUpdateActionResult> => {
+    if (updateState.status !== "available") {
+      return {
+        ok: false,
+        errorMessage: "No update is available to download.",
+      };
+    }
+
+    try {
+      setUpdateState({
+        status: "downloading",
+        availableVersion: updateState.availableVersion,
+        progressPercent: 0,
+      });
+      await autoUpdater.downloadUpdate();
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setUpdateState({
+        status: "error",
+        errorMessage: message,
+        availableVersion: updateState.availableVersion,
+      });
+      return { ok: false, errorMessage: message };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.INSTALL_UPDATE_CHANNEL, (): DesktopUpdateActionResult => {
+    if (updateState.status !== "ready") {
+      return {
+        ok: false,
+        errorMessage: "Download an update before installing.",
+      };
+    }
+
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  });
+}
+
 export function registerAppUpdates(): void {
   if (process.platform !== "darwin" && process.platform !== "win32") {
     console.info("[ceer-updater] Updates are not supported on this platform.");
@@ -114,53 +163,6 @@ export function registerAppUpdates(): void {
       errorMessage: message,
       availableVersion: updateState.availableVersion,
     });
-  });
-
-  ipcMain.on(IpcChannels.GET_UPDATE_STATE_CHANNEL, (event) => {
-    event.returnValue = updateState;
-  });
-
-  ipcMain.handle(IpcChannels.CHECK_FOR_UPDATES_CHANNEL, async () => {
-    await checkForUpdates("manual");
-  });
-
-  ipcMain.handle(IpcChannels.DOWNLOAD_UPDATE_CHANNEL, async (): Promise<DesktopUpdateActionResult> => {
-    if (updateState.status !== "available") {
-      return {
-        ok: false,
-        errorMessage: "No update is available to download.",
-      };
-    }
-
-    try {
-      setUpdateState({
-        status: "downloading",
-        availableVersion: updateState.availableVersion,
-        progressPercent: 0,
-      });
-      await autoUpdater.downloadUpdate();
-      return { ok: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setUpdateState({
-        status: "error",
-        errorMessage: message,
-        availableVersion: updateState.availableVersion,
-      });
-      return { ok: false, errorMessage: message };
-    }
-  });
-
-  ipcMain.handle(IpcChannels.INSTALL_UPDATE_CHANNEL, (): DesktopUpdateActionResult => {
-    if (updateState.status !== "ready") {
-      return {
-        ok: false,
-        errorMessage: "Download an update before installing.",
-      };
-    }
-
-    autoUpdater.quitAndInstall();
-    return { ok: true };
   });
 
   setTimeout(() => {
