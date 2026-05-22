@@ -10,6 +10,7 @@ import { listDesktopSources } from "./list-desktop-sources.ts";
 import {
   attachMainWindowCloseBehavior,
   handleAppActivate,
+  isTrayActive,
   registerRecordingControl,
 } from "./recording-control.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
@@ -175,9 +176,13 @@ if (hasSingleInstanceLock) {
   app.on("ready", initializeApp);
 
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      app.quit();
+    if (process.platform === "darwin") {
+      return;
     }
+    if (process.platform === "win32" && isTrayActive()) {
+      return;
+    }
+    app.quit();
   });
 
   app.on("before-quit", () => {

@@ -17,6 +17,14 @@ const mode = new URLSearchParams(window.location.search).get("mode");
 
 initTheme();
 
+if (mode === "area-picker") {
+  document.documentElement.classList.add("area-picker-root");
+  document.body.classList.add("area-picker-root");
+} else if (mode === "control-widget") {
+  document.documentElement.classList.add("control-widget-root");
+  document.body.classList.add("control-widget-root");
+}
+
 createRoot(root).render(
   <StrictMode>
     {mode === "area-picker" ? (

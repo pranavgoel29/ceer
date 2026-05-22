@@ -32,7 +32,15 @@ export interface RecordingControlDeps {
 }
 
 let tray: Tray | null = null;
+let trayContextMenu: Menu | null = null;
 let controlWidgetWindow: BrowserWindow | null = null;
+
+const isDesktopDev = Boolean(process.env.VITE_DEV_SERVER_URL?.trim());
+const isWin32 = process.platform === "win32";
+
+/** 16×16 PNG — tray fallback when disk icon fails (Electron tray tutorial). */
+const TRAY_ICON_FALLBACK_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAACTSURBVHgBpZKBCYAgEEV/TeAIjuIIbdQIuUGt0CS1gW1iZ2jIVaTnhw+Cvs8/OYDJA4Y8kR3ZR2/kmazxJbpUEfQ/Dm/UG7wVwHkjlQdMFfDdJMFaACebnjJGyDWgcnZu1/lrCrl6NCoEHJBrDwEr5NrT6ko/UV8xdLAC2N49mlc5CylpYh8wCwqrvbBGLoKGvz8Bfq0QPWEUo/EAAAAASUVORK5CYII=";
 let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
@@ -75,9 +83,13 @@ function resolveTrayIconPath(): string {
 }
 
 function createTrayIcon() {
-  const image = nativeImage.createFromPath(resolveTrayIconPath());
+  let image = nativeImage.createFromPath(resolveTrayIconPath());
   if (image.isEmpty()) {
-    return nativeImage.createFromPath(resolveAppIconPath());
+    image = nativeImage.createFromPath(resolveAppIconPath());
+  }
+  if (image.isEmpty()) {
+    console.warn("[ceer-tray] Tray icon missing; using embedded fallback.");
+    image = nativeImage.createFromDataURL(TRAY_ICON_FALLBACK_DATA_URL);
   }
 
   if (process.platform === "darwin") {
@@ -207,10 +219,12 @@ async function refreshTrayMenu(): Promise<void> {
   const canShowControlBar = canShowControlWidget();
 
   let sources: DesktopCaptureSource[] = [];
-  try {
-    sources = await listDesktopSources();
-  } catch {
-    sources = [];
+  if (!sourcesDisabled) {
+    try {
+      sources = await listDesktopSources();
+    } catch {
+      sources = [];
+    }
   }
 
   const screens = sources.filter((source) => source.kind === "screen");
@@ -277,7 +291,10 @@ async function refreshTrayMenu(): Promise<void> {
     },
   ]);
 
-  tray.setContextMenu(menu);
+  trayContextMenu = menu;
+  if (!isWin32) {
+    tray.setContextMenu(menu);
+  }
 
   const targetLabel = remoteState.sourceName ? ` — ${remoteState.sourceName}` : "";
   tray.setToolTip(
@@ -401,16 +418,38 @@ function loadControlWidgetPage(window: BrowserWindow): void {
   void window.loadFile(resolveProductionIndexPath(), { query: { mode: "control-widget" } });
 }
 
+function attachControlWidgetDevLogging(window: BrowserWindow): void {
+  if (!isDesktopDev || !isWin32) {
+    return;
+  }
+
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    console.warn("[ceer-hud] did-fail-load", errorCode, errorDescription);
+  });
+}
+
+function showControlWidgetWindow(window: BrowserWindow): void {
+  if (isWin32) {
+    window.show();
+    return;
+  }
+  window.showInactive();
+}
+
 function createControlWidgetWindow(): BrowserWindow {
   const window = new BrowserWindow({
+    title: "",
     width: 272,
     height: 88,
-    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    ...(process.platform === "darwin"
+      ? { type: "panel" as const, titleBarStyle: "hidden" as const }
+      : {}),
     frame: false,
     transparent: true,
+    useContentSize: true,
     resizable: false,
     movable: true,
-    focusable: false,
+    focusable: isWin32,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -429,9 +468,13 @@ function createControlWidgetWindow(): BrowserWindow {
 
   hudPresentationMode = null;
   attachHudStateSync(window);
+  attachControlWidgetDevLogging(window);
   loadControlWidgetPage(window);
 
   window.once("ready-to-show", () => {
+    if (isDesktopDev && isWin32) {
+      console.info("[ceer-hud] ready-to-show", window.getBounds());
+    }
     syncControlWidgetVisibility();
     pushRecorderStateTo(window);
   });
@@ -462,7 +505,7 @@ function showFloatingHud(window: BrowserWindow): void {
 
   if (!controlBarShown) {
     positionControlWidget(window);
-    window.showInactive();
+    showControlWidgetWindow(window);
     controlBarShown = true;
   } else if (fullscreenOverlay) {
     // Re-anchor when the armed display changes mid-session.
@@ -540,6 +583,15 @@ export function setAreaPickerActive(active: boolean): void {
 
 function syncControlWidgetVisibility(): void {
   if (canPresentFloatingHud()) {
+    if (isDesktopDev && isWin32) {
+      console.info("[ceer-hud] sync present", {
+        phase: remoteState.phase,
+        canRecord: remoteState.canRecord,
+        armedSourceId: remoteState.armedSourceId,
+        controlBarShown,
+        visible: controlWidgetWindow?.isVisible() ?? false,
+      });
+    }
     if (!controlWidgetWindow || controlWidgetWindow.isDestroyed()) {
       controlWidgetWindow = createControlWidgetWindow();
     } else {
@@ -694,16 +746,34 @@ export function registerRecordingControl(deps: RecordingControlDeps): void {
 
   tray = new Tray(createTrayIcon());
   tray.setToolTip("Ceer — Screen recorder");
+
+  const openTrayMenu = (): void => {
+    if (trayContextMenu) {
+      tray?.popUpContextMenu(trayContextMenu);
+      void refreshTrayMenu();
+      return;
+    }
+    void refreshTrayMenu().then(() => {
+      if (trayContextMenu) {
+        tray?.popUpContextMenu(trayContextMenu);
+      }
+    });
+  };
+
   if (process.platform === "darwin") {
     tray.setTitle("");
     tray.on("right-click", () => {
       void refreshTrayMenu();
     });
+  } else if (isWin32) {
+    tray.on("click", () => {
+      showMainWindow();
+      void refreshTrayMenu();
+    });
+    tray.on("right-click", openTrayMenu);
   } else {
     tray.on("click", () => {
-      void refreshTrayMenu().then(() => {
-        tray?.popUpContextMenu();
-      });
+      openTrayMenu();
     });
   }
   void refreshTrayMenu();
@@ -762,6 +832,10 @@ export function handleAppActivate(): void {
     main.restore();
   }
   main.focus();
+}
+
+export function isTrayActive(): boolean {
+  return tray !== null;
 }
 
 export function attachMainWindowCloseBehavior(

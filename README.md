@@ -47,7 +47,8 @@ Shared everywhere:
 
 **Windows**
 
-- Tray: **left-click** the notification area icon to open the menu.
+- Tray: **left-click** the notification area icon to show Ceer; **right-click** to open the menu. If the icon is hidden, open the overflow area (**^**) in the taskbar notification corner.
+- HUD: floating control bar appears when a target is armed or while recording.
 
 #### Browser
 

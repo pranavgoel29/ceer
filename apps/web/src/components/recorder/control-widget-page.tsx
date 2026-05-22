@@ -39,9 +39,6 @@ export function ControlWidgetPage() {
   const [state, setState] = useState<RecorderRemoteState>(defaultState);
 
   useEffect(() => {
-    document.documentElement.classList.add("control-widget-root");
-    document.body.classList.add("control-widget-root");
-
     const bridge = getControlWidgetBridge();
     if (bridge) {
       setState(bridge.getRecorderState());
@@ -52,8 +49,6 @@ export function ControlWidgetPage() {
 
     return () => {
       unsubscribe?.();
-      document.documentElement.classList.remove("control-widget-root");
-      document.body.classList.remove("control-widget-root");
     };
   }, []);
 

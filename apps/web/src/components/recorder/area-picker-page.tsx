@@ -43,8 +43,6 @@ export function AreaPickerPage() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.add("area-picker-root");
-    document.body.classList.add("area-picker-root");
     reloadPickerState();
 
     const unsubscribe = window.areaPickerBridge?.onSourceChanged(() => {
@@ -54,8 +52,6 @@ export function AreaPickerPage() {
 
     return () => {
       unsubscribe?.();
-      document.documentElement.classList.remove("area-picker-root");
-      document.body.classList.remove("area-picker-root");
     };
   }, [reloadPickerState]);
 
