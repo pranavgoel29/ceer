@@ -2,6 +2,7 @@ import type { CaptureSourceKind, DesktopCaptureSource } from "@ceer/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import { formatDesktopSourcesError } from "~/lib/desktop-screen-capture";
 import { SOURCES_LOADING_MIN_MS, waitForMinDuration } from "~/lib/min-duration";
 
 export function useDesktopSources() {
@@ -29,7 +30,7 @@ export function useDesktopSources() {
       }
     } catch (cause) {
       if (refreshGenerationRef.current === generation) {
-        setError(cause instanceof Error ? cause.message : "Could not list windows");
+        setError(formatDesktopSourcesError(cause, bridge.getAppInfo()));
         setSources([]);
       }
     } finally {

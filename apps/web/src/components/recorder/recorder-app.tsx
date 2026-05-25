@@ -236,7 +236,6 @@ function DesktopRecorderContent() {
         <SourcePicker
           sources={sources}
           loading={loading}
-          error={error}
           selectedId={selectedSource?.id ?? null}
           areaSourceId={areaSourceId}
           pickingArea={pickingArea}

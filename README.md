@@ -41,6 +41,8 @@ Shared everywhere:
 
 **macOS**
 
+- **Screen Recording permission** is required to list screens/windows and capture video. If sources fail to load, open **System Settings → Privacy & Security → Screen & System Audio Recording** and enable the app you are actually running.
+- **Development vs packaged app:** `bun run dev:desktop` launches the Electron binary (`Electron` or **Ceer (Dev)** in the list). A built **Ceer.app** is a separate entry (`Ceer` / **Ceer.app**). macOS tracks permissions per binary, so you may see two Ceer-related rows — enable the one that matches how you launched the app, or reset stale entries with `tccutil reset ScreenCapture` and grant again on next launch.
 - Apps in a native fullscreen Space often disappear from the **Windows** list — choose the matching **Screen** instead.
 - Screen picks store a `displayId` so the same monitor stays selected after Exposé or Mission Control even when Electron source IDs change.
 - Tray: **right-click** the menu bar icon. HUD uses a `panel` window so it can sit above other apps’ fullscreen modes.

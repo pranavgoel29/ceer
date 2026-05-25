@@ -49,6 +49,18 @@ export interface DesktopAppInfo {
   readonly isDevelopment: boolean;
 }
 
+/** IPC error code when macOS Screen Recording permission is missing or denied. */
+export const SCREEN_CAPTURE_PERMISSION_DENIED_CODE = "ceer:screen-capture-denied" as const;
+
+/** True when an Error.message (including Electron IPC wrappers) indicates screen capture was denied. */
+export function isScreenCapturePermissionDeniedMessage(message: string): boolean {
+  return (
+    message.includes(SCREEN_CAPTURE_PERMISSION_DENIED_CODE) ||
+    message.includes("ScreenCapturePermissionError") ||
+    message.includes("Failed to get sources")
+  );
+}
+
 export interface CapturePreferences {
   readonly systemAudioEnabled: boolean;
 }

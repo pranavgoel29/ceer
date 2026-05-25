@@ -15,7 +15,6 @@ import { cn } from "~/lib/utils";
 interface SourcePickerProps {
   readonly sources: DesktopCaptureSource[];
   readonly loading: boolean;
-  readonly error: string | null;
   readonly selectedId: string | null;
   readonly areaSourceId: string | null;
   readonly pickingArea?: boolean;
@@ -34,7 +33,6 @@ const tabMeta: { value: CaptureSourceKind | "all"; label: string }[] = [
 export function SourcePicker({
   sources,
   loading,
-  error,
   selectedId,
   areaSourceId,
   pickingArea = false,
@@ -99,8 +97,6 @@ export function SourcePicker({
           matching Screen to record them.
         </p>
       ) : null}
-
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <AreaPickSection
         sources={sources}

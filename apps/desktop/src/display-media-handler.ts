@@ -2,6 +2,10 @@ import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
 import type { DesktopCapturerSource, Session } from "electron";
 
 import { pickCapturerVideoSource } from "./resolve-capture-source.ts";
+import {
+  ensureScreenCaptureAccess,
+  throwIfDesktopCapturerAccessFailure,
+} from "./screen-capture-permission.ts";
 
 export interface DisplayMediaHandlerState {
   selectedCaptureSource: CaptureSourceRef | null;
@@ -38,11 +42,18 @@ async function handleDisplayMediaRequest(
     callback(response);
   };
 
+  await ensureScreenCaptureAccess();
+
   const { desktopCapturer } = await import("electron");
-  const sources = await desktopCapturer.getSources({
-    types: ["screen", "window"],
-    thumbnailSize: { width: 1, height: 1 },
-  });
+  let sources;
+  try {
+    sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 1, height: 1 },
+    });
+  } catch (error) {
+    throwIfDesktopCapturerAccessFailure(error);
+  }
 
   const { selectedCaptureSource, capturePreferences } = getState();
   const video = pickCapturerVideoSource(sources, selectedCaptureSource);
