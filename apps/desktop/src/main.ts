@@ -1,12 +1,26 @@
-import { app, BrowserWindow, ipcMain, session, systemPreferences } from "electron";
+import { app, BrowserWindow, ipcMain, session } from "electron";
 import path from "node:path";
 
-import type { CapturePreferences, CaptureSourceRef } from "@ceer/contracts";
+import type { CapturePreferences, CaptureSourceRef, PrivacyPane } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
+import {
+  getCapturePreferences,
+  getSelectedCaptureSource,
+  resetCaptureState,
+  setCapturePreferences,
+  setSelectedCaptureSource,
+} from "./capture-state.ts";
 import { registerDisplayMediaHandler } from "./display-media-handler.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { listDesktopSources } from "./list-desktop-sources.ts";
+import {
+  getPermissionStatus,
+  openPrivacySettings,
+  relaunchApp,
+  requestMicrophoneAccess,
+  requestScreenCaptureAccess,
+} from "./permissions.ts";
 import {
   attachMainWindowCloseBehavior,
   handleAppActivate,
@@ -25,8 +39,6 @@ if (!hasSingleInstanceLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let selectedCaptureSource: CaptureSourceRef | null = null;
-let capturePreferences: CapturePreferences = { systemAudioEnabled: true };
 let isQuitting = false;
 
 function resolvePreloadPath(): string {
@@ -43,8 +55,8 @@ function resolveAppIconPath(): string {
 
 function wireDisplayMediaHandler(): void {
   registerDisplayMediaHandler(session.defaultSession, () => ({
-    selectedCaptureSource,
-    capturePreferences,
+    selectedCaptureSource: getSelectedCaptureSource(),
+    capturePreferences: getCapturePreferences(),
   }));
 }
 
@@ -98,32 +110,25 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.GET_DESKTOP_SOURCES_CHANNEL, () => listDesktopSources());
 
   ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (event, source: CaptureSourceRef | null) => {
-    selectedCaptureSource = source;
+    setSelectedCaptureSource(source);
     event.returnValue = null;
   });
 
   ipcMain.on(IpcChannels.SET_CAPTURE_PREFERENCES_CHANNEL, (event, preferences: CapturePreferences) => {
-    capturePreferences = {
-      systemAudioEnabled: Boolean(preferences.systemAudioEnabled),
-    };
+    setCapturePreferences(preferences);
     event.returnValue = null;
   });
 
-  ipcMain.handle(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL, async () => {
-    if (process.platform !== "darwin") {
-      return true;
-    }
-
-    const status = systemPreferences.getMediaAccessStatus("microphone");
-    if (status === "granted") {
-      return true;
-    }
-
-    if (status === "denied" || status === "restricted") {
-      return false;
-    }
-
-    return systemPreferences.askForMediaAccess("microphone");
+  ipcMain.handle(IpcChannels.GET_PERMISSION_STATUS_CHANNEL, () => getPermissionStatus());
+  ipcMain.handle(IpcChannels.REQUEST_SCREEN_CAPTURE_ACCESS_CHANNEL, () =>
+    requestScreenCaptureAccess(),
+  );
+  ipcMain.handle(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL, () => requestMicrophoneAccess());
+  ipcMain.handle(IpcChannels.OPEN_PRIVACY_SETTINGS_CHANNEL, (_event, pane: PrivacyPane) =>
+    openPrivacySettings(pane),
+  );
+  ipcMain.handle(IpcChannels.RELAUNCH_APP_CHANNEL, () => {
+    relaunchApp();
   });
 }
 
@@ -138,7 +143,7 @@ function initializeApp(): void {
   registerRecordingControl({
     getMainWindow: () => mainWindow,
     setCaptureSource: (source) => {
-      selectedCaptureSource = source;
+      setSelectedCaptureSource(source);
     },
   });
   registerUpdateIpcHandlers();
@@ -187,8 +192,7 @@ if (hasSingleInstanceLock) {
 
   app.on("before-quit", () => {
     isQuitting = true;
-    selectedCaptureSource = null;
-    capturePreferences = { systemAudioEnabled: true };
+    resetCaptureState();
     disposeAppUpdates();
   });
 }

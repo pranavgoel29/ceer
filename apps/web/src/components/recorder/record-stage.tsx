@@ -81,8 +81,8 @@ export function RecordStage({
   return (
     <RecorderPanel
       eyebrow="Stage"
-      title="Preview & playback"
-      description="What you capture is what you get — check framing before you roll."
+      title="Preview"
+      description="Check framing before you hit record."
       accent="coral"
       tilt="left"
       contentClassName="gap-0 p-0 sm:p-0"

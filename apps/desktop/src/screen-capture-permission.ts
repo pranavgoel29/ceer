@@ -1,6 +1,6 @@
-import { systemPreferences } from "electron";
-
 import { SCREEN_CAPTURE_PERMISSION_DENIED_CODE } from "@ceer/contracts";
+
+import { getScreenMediaAccessStatus, requestScreenCaptureAccess } from "./permissions.ts";
 
 export class ScreenCapturePermissionError extends Error {
   constructor() {
@@ -15,7 +15,7 @@ export function isDesktopCapturerAccessFailure(error: unknown): boolean {
 }
 
 /**
- * macOS: prompt when needed before desktopCapturer. Does not throw when TCC reports
+ * Prompt when Screen Recording is not-determined. Does not throw when TCC reports
  * denied — the toggle can be on while the API is stale until restart; capture is tried next.
  */
 export async function ensureScreenCaptureAccess(): Promise<void> {
@@ -23,17 +23,19 @@ export async function ensureScreenCaptureAccess(): Promise<void> {
     return;
   }
 
-  const status = systemPreferences.getMediaAccessStatus("screen");
+  const status = getScreenMediaAccessStatus();
   if (status === "granted" || status === "denied" || status === "restricted") {
     return;
   }
 
-  // not-determined: ask lazily when the user opens the source picker.
-  const askScreenAccess = systemPreferences.askForMediaAccess as unknown as (
-    mediaType: "screen",
-  ) => Promise<boolean>;
-  const granted = await askScreenAccess("screen");
+  const granted = await requestScreenCaptureAccess();
   if (!granted) {
+    throw new ScreenCapturePermissionError();
+  }
+}
+
+export function throwIfScreenCaptureNotDetermined(): void {
+  if (getScreenMediaAccessStatus() === "not-determined") {
     throw new ScreenCapturePermissionError();
   }
 }

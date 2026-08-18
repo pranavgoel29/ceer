@@ -7,6 +7,14 @@ export interface DesktopBridge {
   readonly setCapturePreferences: (preferences: CapturePreferences) => void;
   /** macOS: prompts for microphone access via systemPreferences. Other platforms: no-op, returns true. */
   readonly requestMicrophoneAccess: () => Promise<boolean>;
+  /** Current Screen Recording + microphone TCC/OS status. */
+  readonly getPermissionStatus: () => Promise<DesktopPermissionStatus>;
+  /** macOS: prompts for Screen Recording when status is not-determined. */
+  readonly requestScreenCaptureAccess: () => Promise<boolean>;
+  /** Opens OS privacy settings for screen capture or microphone. */
+  readonly openPrivacySettings: (pane: PrivacyPane) => Promise<boolean>;
+  /** Relaunch after granting Screen Recording (required on macOS). */
+  readonly relaunchApp: () => Promise<void>;
   /** Opens a fullscreen overlay on the source display; null if cancelled. */
   readonly pickCaptureRegion: (sourceId: string) => Promise<CaptureRegionPickResult | null>;
   /** Push recorder state to main (tray/HUD); call from the main window only. */
@@ -61,8 +69,25 @@ export function isScreenCapturePermissionDeniedMessage(message: string): boolean
   );
 }
 
+export type MediaAccessStatus =
+  | "not-determined"
+  | "granted"
+  | "denied"
+  | "restricted"
+  | "unknown";
+
+export type PrivacyPane = "screen" | "microphone";
+
+export interface DesktopPermissionStatus {
+  readonly screen: MediaAccessStatus;
+  readonly microphone: MediaAccessStatus;
+  readonly platform: DesktopAppInfo["platform"];
+  readonly isDevelopment: boolean;
+}
+
 export interface CapturePreferences {
   readonly systemAudioEnabled: boolean;
+  readonly hideMainWhileRecording: boolean;
 }
 
 export type CaptureSourceKind = "screen" | "window";

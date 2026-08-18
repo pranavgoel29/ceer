@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { CaptureSourceRef } from "@ceer/contracts";
+import { isScreenCapturePermissionDeniedMessage } from "@ceer/contracts";
+import { PermissionSetup } from "~/components/permissions/permission-setup";
 import { RecorderPlatformProvider } from "~/components/recorder/recorder-platform-context";
 import { RecorderShell } from "~/components/recorder/recorder-shell";
 import { SourcePicker } from "~/components/recorder/source-picker";
 import { WebCapturePanel } from "~/components/recorder/web-capture-panel";
+import { SettingsScreen } from "~/components/settings/settings-screen";
 import { findMatchingSource, toCaptureSourceRef } from "~/lib/capture-source";
 import { getCapturePlatform } from "~/lib/capture-platform";
+import { useAppSettings } from "~/hooks/use-app-settings";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
+import {
+  needsScreenPermissionSetup,
+  useDesktopPermissions,
+} from "~/hooks/use-desktop-permissions";
 import { useDesktopRecorder } from "~/hooks/use-desktop-recorder";
 import { useWebRecorder } from "~/hooks/use-web-recorder";
 import { useDesktopSources } from "~/hooks/use-desktop-sources";
@@ -27,6 +35,9 @@ function DesktopRecorderContent() {
   const bridge = useDesktopBridge();
   const { sources, loading, error, refresh } = useDesktopSources();
   const recorder = useDesktopRecorder();
+  const permissions = useDesktopPermissions();
+  const { settings, patch } = useAppSettings(true);
+  const [view, setView] = useState<"studio" | "settings">("studio");
 
   const [selectedSource, setSelectedSource] = useState<CaptureSourceRef | null>(null);
   const [areaSourceId, setAreaSourceId] = useState<string | null>(null);
@@ -165,8 +176,23 @@ function DesktopRecorderContent() {
     ) {
       return;
     }
-    recorder.setMicEnabled(enabled);
-    rearmIfPossible();
+
+    void (async () => {
+      if (enabled && bridge) {
+        const granted = await bridge.requestMicrophoneAccess();
+        if (!granted) {
+          patch({ micEnabled: false });
+          recorder.setMicEnabled(false);
+          recorder.setError(
+            "Microphone is blocked. Allow it in Settings → Permissions, then try again.",
+          );
+          return;
+        }
+      }
+      patch({ micEnabled: enabled });
+      recorder.setMicEnabled(enabled);
+      rearmIfPossible();
+    })();
   };
 
   const handleSystemAudioChange = (enabled: boolean) => {
@@ -179,6 +205,7 @@ function DesktopRecorderContent() {
       return;
     }
     recorder.setSystemAudioEnabled(enabled);
+    patch({ systemAudioEnabled: enabled });
     rearmIfPossible();
   };
 
@@ -222,16 +249,75 @@ function DesktopRecorderContent() {
     });
   }, [bridge, sources, recorder.phase]);
 
+  useEffect(() => {
+    bridge?.setCapturePreferences({
+      systemAudioEnabled: recorder.systemAudioEnabled,
+      hideMainWhileRecording: settings.hideMainWhileRecording,
+    });
+  }, [bridge, recorder.systemAudioEnabled, settings.hideMainWhileRecording]);
+
+  useEffect(() => {
+    if (
+      recorder.phase === "recording" ||
+      recorder.phase === "stopping" ||
+      recorder.previewLoading ||
+      recorder.audioMixing
+    ) {
+      return;
+    }
+    if (recorder.micEnabled !== settings.micEnabled) {
+      recorder.setMicEnabled(settings.micEnabled);
+    }
+    if (recorder.systemAudioEnabled !== settings.systemAudioEnabled) {
+      recorder.setSystemAudioEnabled(settings.systemAudioEnabled);
+    }
+  }, [
+    recorder.audioMixing,
+    recorder.micEnabled,
+    recorder.phase,
+    recorder.previewLoading,
+    recorder.setMicEnabled,
+    recorder.setSystemAudioEnabled,
+    recorder.systemAudioEnabled,
+    settings.micEnabled,
+    settings.systemAudioEnabled,
+  ]);
+
   const pickerDisabled =
     recorder.phase === "recording" || recorder.phase === "stopping";
+  const permissionError = Boolean(error && isScreenCapturePermissionDeniedMessage(error));
+  const showPermissionSetup = needsScreenPermissionSetup(
+    permissions.status,
+    sources.length > 0,
+    permissionError,
+    loading,
+  );
+
+  if (view === "settings") {
+    return <SettingsScreen isDesktop onBack={() => setView("studio")} />;
+  }
+
+  if (showPermissionSetup) {
+    return (
+      <PermissionSetup
+        loadingSources={loading}
+        onRetrySources={() => {
+          void permissions.refresh();
+          void refresh();
+        }}
+        onOpenSettings={() => setView("settings")}
+      />
+    );
+  }
 
   return (
     <RecorderShell
       recorder={recorder}
-      sourcesError={error}
+      sourcesError={permissionError ? null : error}
       onDiscard={handleDiscard}
       onMicChange={handleMicChange}
       onSystemAudioChange={handleSystemAudioChange}
+      onOpenSettings={() => setView("settings")}
       sidebar={
         <SourcePicker
           sources={sources}
@@ -251,6 +337,8 @@ function DesktopRecorderContent() {
 
 function WebRecorderContent() {
   const recorder = useWebRecorder();
+  const { patch } = useAppSettings(false);
+  const [view, setView] = useState<"studio" | "settings">("studio");
 
   const handleWebShare = () => {
     if (recorder.phase === "recording" || recorder.phase === "stopping") {
@@ -263,9 +351,22 @@ function WebRecorderContent() {
   const pickerDisabled =
     recorder.phase === "recording" || recorder.phase === "stopping";
 
+  if (view === "settings") {
+    return <SettingsScreen isDesktop={false} onBack={() => setView("studio")} />;
+  }
+
   return (
     <RecorderShell
       recorder={recorder}
+      onOpenSettings={() => setView("settings")}
+      onMicChange={(enabled) => {
+        patch({ micEnabled: enabled });
+        recorder.setMicEnabled(enabled);
+      }}
+      onSystemAudioChange={(enabled) => {
+        patch({ systemAudioEnabled: enabled });
+        recorder.setSystemAudioEnabled(enabled);
+      }}
       sidebar={
         <WebCapturePanel
           phase={recorder.phase}

@@ -1,11 +1,14 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { CountdownOverlay } from "~/components/recorder/countdown-overlay";
 import { RecordControls } from "~/components/recorder/record-controls";
 import { RecordStage } from "~/components/recorder/record-stage";
 import { RecorderHeader } from "~/components/recorder/recorder-header";
 import { useRecorderPlatformContext } from "~/components/recorder/recorder-platform-context";
 import type { RecorderApi } from "~/hooks/recorder-api";
 import { isDesktopRecorderApi, isWebRecorderApi } from "~/hooks/recorder-api";
+import { useAppSettings } from "~/hooks/use-app-settings";
 
 const SHELL_CHROME = (
   <>
@@ -21,6 +24,7 @@ interface RecorderShellProps {
   readonly onDiscard?: () => void;
   readonly onMicChange?: (enabled: boolean) => void;
   readonly onSystemAudioChange?: (enabled: boolean) => void;
+  readonly onOpenSettings?: () => void;
 }
 
 export function RecorderShell({
@@ -30,24 +34,68 @@ export function RecorderShell({
   onDiscard,
   onMicChange,
   onSystemAudioChange,
+  onOpenSettings,
 }: RecorderShellProps) {
   const { isWeb, isDesktop } = useRecorderPlatformContext();
+  const { settings } = useAppSettings(isDesktop);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
   const combinedError = sourcesError ?? recorder.error;
   const shareAudioNotice =
     isWeb && isWebRecorderApi(recorder) ? recorder.shareAudioNotice : null;
 
   const isActiveCapture =
     recorder.phase === "recording" || recorder.phase === "stopping";
-  const canRecord = recorder.canArm;
+  const canRecord = recorder.canArm && countdown === null;
   const togglesDisabled =
-    isActiveCapture || recorder.previewLoading || recorder.audioMixing;
+    isActiveCapture || recorder.previewLoading || recorder.audioMixing || countdown !== null;
+
+  const startRecording = recorder.startRecording;
+
+  useEffect(() => {
+    if (countdown === null) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (countdown <= 1) {
+        setCountdown(null);
+        startRecording();
+        return;
+      }
+      setCountdown(countdown - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [countdown, startRecording]);
+
+  useEffect(() => {
+    if (recorder.phase !== "armed" && countdown !== null) {
+      setCountdown(null);
+    }
+  }, [recorder.phase, countdown]);
+
+  const handleStart = () => {
+    if (!canRecord || isActiveCapture) {
+      return;
+    }
+    if (!settings.countdownEnabled) {
+      recorder.startRecording();
+      return;
+    }
+    setCountdown(3);
+  };
 
   return (
     <div className="ceer-shell ceer-grain relative overflow-x-hidden">
       {SHELL_CHROME}
 
+      {countdown !== null ? (
+        <CountdownOverlay remaining={countdown} onCancel={() => setCountdown(null)} />
+      ) : null}
+
       <div className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:gap-6">
-        <RecorderHeader phase={recorder.phase} />
+        <RecorderHeader phase={recorder.phase} onOpenSettings={onOpenSettings} />
 
         <div className="ceer-stagger flex flex-col gap-4 lg:gap-5">
           {combinedError ? (
@@ -97,7 +145,7 @@ export function RecorderShell({
                   togglesDisabled={togglesDisabled}
                   onMicChange={onMicChange ?? recorder.setMicEnabled}
                   onSystemAudioChange={onSystemAudioChange ?? recorder.setSystemAudioEnabled}
-                  onStart={recorder.startRecording}
+                  onStart={handleStart}
                   onStop={recorder.stopRecording}
                   onDiscard={onDiscard ?? recorder.discardRecording}
                 />
