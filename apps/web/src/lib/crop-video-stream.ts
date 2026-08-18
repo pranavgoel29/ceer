@@ -5,11 +5,48 @@ export interface CroppedStreamResult {
   readonly cleanup: () => void;
 }
 
-export async function cropVideoStream(
+export interface CropStreamHandle {
+  readonly stream: MediaStream;
+  readonly setRegion: (region: CaptureRegion, display: DisplayBounds) => void;
+  readonly setFrozen: (frozen: boolean) => void;
+  readonly replaceVideo: (nextStream: MediaStream) => Promise<void>;
+  readonly cleanup: () => void;
+}
+
+function waitForVideo(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 1 && video.videoWidth > 0) {
+    return video.play().then(() => undefined);
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    video.onloadedmetadata = () => {
+      void video.play().then(() => resolve()).catch(reject);
+    };
+    video.onerror = () => reject(new Error("Could not load capture for cropping."));
+  });
+}
+
+function scaledCrop(
+  region: CaptureRegion,
+  display: DisplayBounds,
+  frameWidth: number,
+  frameHeight: number,
+) {
+  const scaleX = frameWidth / display.width;
+  const scaleY = frameHeight / display.height;
+  return {
+    x: Math.round(region.x * scaleX),
+    y: Math.round(region.y * scaleY),
+    width: Math.max(2, Math.round(region.width * scaleX)),
+    height: Math.max(2, Math.round(region.height * scaleY)),
+  };
+}
+
+export async function createCroppedStream(
   sourceStream: MediaStream,
   region: CaptureRegion,
   display: DisplayBounds,
-): Promise<CroppedStreamResult> {
+): Promise<CropStreamHandle> {
   const videoTrack = sourceStream.getVideoTracks()[0];
   if (!videoTrack) {
     throw new Error("No video track to crop.");
@@ -19,36 +56,41 @@ export async function cropVideoStream(
   video.muted = true;
   video.playsInline = true;
   video.srcObject = new MediaStream([videoTrack]);
+  await waitForVideo(video);
 
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve();
-    video.onerror = () => reject(new Error("Could not load capture for cropping."));
-    void video.play().catch(reject);
-  });
-
-  const frameWidth = video.videoWidth;
-  const frameHeight = video.videoHeight;
-  const scaleX = frameWidth / display.width;
-  const scaleY = frameHeight / display.height;
-
-  const crop = {
-    x: Math.round(region.x * scaleX),
-    y: Math.round(region.y * scaleY),
-    width: Math.max(2, Math.round(region.width * scaleX)),
-    height: Math.max(2, Math.round(region.height * scaleY)),
-  };
-
+  const initial = scaledCrop(region, display, video.videoWidth, video.videoHeight);
   const canvas = document.createElement("canvas");
-  canvas.width = crop.width;
-  canvas.height = crop.height;
-  const context = canvas.getContext("2d");
+  canvas.width = initial.width;
+  canvas.height = initial.height;
+  const context = canvas.getContext("2d", { alpha: false });
   if (!context) {
     throw new Error("Canvas not available.");
   }
 
+  let currentRegion = region;
+  let currentDisplay = display;
+  let frozen = false;
+  let running = true;
   let frameId = 0;
+
   const drawFrame = () => {
-    context.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    if (!running) {
+      return;
+    }
+    if (!frozen && video.videoWidth >= 2 && video.videoHeight >= 2) {
+      const crop = scaledCrop(currentRegion, currentDisplay, video.videoWidth, video.videoHeight);
+      context.drawImage(
+        video,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+    }
     frameId = requestAnimationFrame(drawFrame);
   };
   drawFrame();
@@ -58,14 +100,40 @@ export async function cropVideoStream(
     croppedStream.addTrack(track);
   }
 
-  const cleanup = () => {
-    cancelAnimationFrame(frameId);
-    video.pause();
-    video.srcObject = null;
-    for (const track of croppedStream.getVideoTracks()) {
-      track.stop();
-    }
+  return {
+    stream: croppedStream,
+    setRegion: (nextRegion, nextDisplay) => {
+      currentRegion = nextRegion;
+      currentDisplay = nextDisplay;
+    },
+    setFrozen: (nextFrozen) => {
+      frozen = nextFrozen;
+    },
+    replaceVideo: async (nextStream) => {
+      const nextTrack = nextStream.getVideoTracks()[0];
+      if (!nextTrack) {
+        return;
+      }
+      video.srcObject = new MediaStream([nextTrack]);
+      await waitForVideo(video);
+    },
+    cleanup: () => {
+      running = false;
+      cancelAnimationFrame(frameId);
+      video.pause();
+      video.srcObject = null;
+      for (const track of croppedStream.getVideoTracks()) {
+        track.stop();
+      }
+    },
   };
+}
 
-  return { stream: croppedStream, cleanup };
+export async function cropVideoStream(
+  sourceStream: MediaStream,
+  region: CaptureRegion,
+  display: DisplayBounds,
+): Promise<CroppedStreamResult> {
+  const handle = await createCroppedStream(sourceStream, region, display);
+  return { stream: handle.stream, cleanup: handle.cleanup };
 }

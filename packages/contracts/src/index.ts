@@ -15,6 +15,8 @@ export interface DesktopBridge {
   readonly openPrivacySettings: (pane: PrivacyPane) => Promise<boolean>;
   /** Relaunch after granting Screen Recording (required on macOS). */
   readonly relaunchApp: () => Promise<void>;
+  /** macOS: screen capture + crop plan for a window (avoids Mission Control window-stream warping). */
+  readonly resolveWindowCapture: (source: CaptureSourceRef) => Promise<WindowCapturePlan | null>;
   /** Opens a fullscreen overlay on the source display; null if cancelled. */
   readonly pickCaptureRegion: (sourceId: string) => Promise<CaptureRegionPickResult | null>;
   /** Push recorder state to main (tray/HUD); call from the main window only. */
@@ -182,9 +184,23 @@ export interface ControlWidgetBridge {
   readonly sendRecorderCommand: (command: RecorderRemoteCommand) => void;
 }
 
+export interface WindowCapturePlan {
+  readonly screen: CaptureSourceRef;
+  readonly pick: CaptureRegionPickResult;
+}
+
 /** Electron desktopCapturer ids are prefixed with `screen:` or `window:`. */
 export function classifySourceKindFromId(sourceId: string): CaptureSourceKind {
   return sourceId.startsWith("screen:") ? "screen" : "window";
+}
+
+export function parseCapturerWindowId(sourceId: string): number | null {
+  const match = /^window:(\d+)/.exec(sourceId);
+  if (!match) {
+    return null;
+  }
+  const windowId = Number(match[1]);
+  return Number.isFinite(windowId) ? windowId : null;
 }
 
 export function toCaptureSourceRef(source: DesktopCaptureSource): CaptureSourceRef {

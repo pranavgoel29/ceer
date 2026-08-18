@@ -60,8 +60,13 @@ function DesktopRecorderContent() {
 
     const next = toCaptureSourceRef(match);
     setSelectedSource(next);
-    bridge?.setCaptureSource(next);
-  }, [bridge, selectedSource, sources]);
+
+    if (recorder.phase === "armed" || recorder.phase === "recording") {
+      void recorder.rebindCapture(next);
+    } else {
+      bridge?.setCaptureSource(next);
+    }
+  }, [bridge, selectedSource, sources, recorder.phase, recorder.rebindCapture]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -69,11 +74,7 @@ function DesktopRecorderContent() {
       if (!current) {
         return;
       }
-      if (
-        recorder.phase === "armed" ||
-        recorder.phase === "recording" ||
-        recorder.phase === "stopping"
-      ) {
+      if (recorder.phase === "stopping") {
         return;
       }
       if (pickingArea) {
@@ -85,7 +86,11 @@ function DesktopRecorderContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [refresh, recorder.phase, pickingArea]);
 
   const handleSelectSource = (sourceId: string) => {
