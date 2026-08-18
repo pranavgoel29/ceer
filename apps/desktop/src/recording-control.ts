@@ -22,6 +22,7 @@ import {
   type RecorderRemoteState,
 } from "@ceer/contracts";
 
+import { getCapturePreferences } from "./capture-state.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { listDesktopSources } from "./list-desktop-sources.ts";
 import { resolveProductionIndexPath } from "./resolve-renderer.ts";
@@ -692,7 +693,7 @@ function applyRemoteState(next: RecorderRemoteState, previous: RecorderRemoteSta
   const hudVisibilityChanged = recorderStateAffectsHudVisibility(next, previous);
   setPowerSaveBlocker(isRecording);
 
-  if (isRecording && !previousRecording) {
+  if (isRecording && !previousRecording && getCapturePreferences().hideMainWhileRecording) {
     hideMainForCaptureSession();
   }
 

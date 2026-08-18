@@ -505,6 +505,27 @@
   .ceer-thumbnail-inner {
     background: var(--ceer-thumbnail-inner);
   }
+
+  .ceer-countdown-scrim {
+    background: oklch(0.13 0.01 55 / 72%);
+    backdrop-filter: blur(10px);
+  }
+
+  .ceer-countdown-number {
+    color: var(--ceer-coral);
+    animation: ceer-countdown-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .ceer-mode-chip {
+    border: 1px solid var(--border);
+    background: var(--muted);
+  }
+
+  .ceer-mode-chip--active {
+    border-color: var(--ceer-lime);
+    background: var(--ceer-lime-surface);
+    box-shadow: var(--shadow-ceer-source-selected);
+  }
 }
 
 @keyframes ceer-float {
@@ -554,6 +575,17 @@
   }
   50% {
     opacity: 0.2;
+  }
+}
+
+@keyframes ceer-countdown-pop {
+  from {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

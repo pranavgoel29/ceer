@@ -4,12 +4,12 @@ import type { DesktopCaptureSource } from "@ceer/contracts";
 
 import { classifySourceKind } from "./resolve-capture-source.ts";
 import {
-  ensureScreenCaptureAccess,
   throwIfDesktopCapturerAccessFailure,
+  throwIfScreenCaptureNotDetermined,
 } from "./screen-capture-permission.ts";
 
 export async function listDesktopSources(): Promise<DesktopCaptureSource[]> {
-  await ensureScreenCaptureAccess();
+  throwIfScreenCaptureNotDetermined();
 
   let sources;
   try {

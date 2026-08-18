@@ -21,6 +21,12 @@ const desktopBridge: DesktopBridge = {
   },
   requestMicrophoneAccess: () =>
     ipcRenderer.invoke(IpcChannels.REQUEST_MICROPHONE_ACCESS_CHANNEL),
+  getPermissionStatus: () => ipcRenderer.invoke(IpcChannels.GET_PERMISSION_STATUS_CHANNEL),
+  requestScreenCaptureAccess: () =>
+    ipcRenderer.invoke(IpcChannels.REQUEST_SCREEN_CAPTURE_ACCESS_CHANNEL),
+  openPrivacySettings: (pane) =>
+    ipcRenderer.invoke(IpcChannels.OPEN_PRIVACY_SETTINGS_CHANNEL, pane),
+  relaunchApp: () => ipcRenderer.invoke(IpcChannels.RELAUNCH_APP_CHANNEL),
   pickCaptureRegion: (sourceId) =>
     ipcRenderer.invoke(IpcChannels.PICK_CAPTURE_REGION_CHANNEL, sourceId),
   publishRecorderState: (state: RecorderRemoteState) => {

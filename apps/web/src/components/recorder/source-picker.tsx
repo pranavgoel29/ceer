@@ -1,16 +1,22 @@
 import type { CaptureSourceKind, DesktopCaptureSource } from "@ceer/contracts";
-import { ArrowsClockwiseIcon, DesktopIcon, SquareIcon } from "@phosphor-icons/react";
+import {
+  AppWindowIcon,
+  ArrowsClockwiseIcon,
+  CropIcon,
+  DesktopIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { filterSourcesByKind } from "~/hooks/use-desktop-sources";
 import { tiltClassForSourceId } from "~/lib/capture-source";
 import { loadingQuips, pickQuip } from "~/lib/quips";
 import { cn } from "~/lib/utils";
+
+type CaptureMode = CaptureSourceKind | "region";
 
 interface SourcePickerProps {
   readonly sources: DesktopCaptureSource[];
@@ -24,10 +30,10 @@ interface SourcePickerProps {
   readonly onPickArea: (sourceId: string) => void;
 }
 
-const tabMeta: { value: CaptureSourceKind | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "screen", label: "Screens" },
-  { value: "window", label: "Windows" },
+const MODES: { value: CaptureMode; label: string; icon: typeof DesktopIcon }[] = [
+  { value: "screen", label: "Screen", icon: DesktopIcon },
+  { value: "window", label: "Window", icon: AppWindowIcon },
+  { value: "region", label: "Region", icon: CropIcon },
 ];
 
 export function SourcePicker({
@@ -41,16 +47,18 @@ export function SourcePicker({
   onSelect,
   onPickArea,
 }: SourcePickerProps) {
-  const [tab, setTab] = useState<CaptureSourceKind | "all">("all");
+  const [mode, setMode] = useState<CaptureMode>("screen");
   const bridge = useDesktopBridge();
   const isMac = bridge?.getAppInfo().platform === "darwin";
+  const listKind: CaptureSourceKind = mode === "window" ? "window" : "screen";
+  const visibleSources = filterSourcesByKind(sources, listKind);
   const windowSources = filterSourcesByKind(sources, "window");
 
   return (
     <RecorderPanel
-      eyebrow="Sources"
-      title="Pick your prey"
-      description="Screens, apps, or a cropped region."
+      eyebrow="Capture"
+      title="What to record"
+      description="Screen, a single window, or a custom region."
       accent="lime"
       tilt="right"
       action={
@@ -65,47 +73,58 @@ export function SourcePicker({
         </Button>
       }
     >
-      <Tabs value={tab} onValueChange={(value) => setTab(value as CaptureSourceKind | "all")}>
-        <TabsList className="grid h-9 w-full grid-cols-3">
-          {tabMeta.map((item) => (
-            <TabsTrigger key={item.value} value={item.value} className="text-xs">
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        {tabMeta.map((item) => (
-          <TabsContent key={item.value} value={item.value} className="mt-3">
-            <SourceGrid
-              sources={filterSourcesByKind(sources, item.value)}
-              selectedId={selectedId}
+      <div className="grid grid-cols-3 gap-2">
+        {MODES.map((item) => {
+          const Icon = item.icon;
+          const active = mode === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
               disabled={disabled}
-              loading={loading}
-              onSelect={onSelect}
-              emptyHint={
-                isMac && item.value === "window" && windowSources.length === 0
-                  ? "No windows listed — fullscreen apps are usually only available as a Screen on macOS."
-                  : undefined
-              }
-            />
-          </TabsContent>
-        ))}
-      </Tabs>
+              onClick={() => setMode(item.value)}
+              className={cn(
+                "ceer-mode-chip flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-xs font-medium transition-colors",
+                active && "ceer-mode-chip--active",
+                disabled && "pointer-events-none opacity-50",
+              )}
+            >
+              <Icon className="size-5" weight={active ? "fill" : "duotone"} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {isMac ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          On macOS, apps in native fullscreen usually do not appear under Windows — choose the
-          matching Screen to record them.
-        </p>
+      {mode === "region" ? (
+        <AreaPickSection
+          sources={sources}
+          selectedId={selectedId}
+          areaSourceId={areaSourceId}
+          pickingArea={pickingArea}
+          disabled={disabled}
+          onPickArea={onPickArea}
+        />
       ) : null}
 
-      <AreaPickSection
-        sources={sources}
+      <SourceGrid
+        sources={visibleSources}
         selectedId={selectedId}
-        areaSourceId={areaSourceId}
-        pickingArea={pickingArea}
         disabled={disabled}
-        onPickArea={onPickArea}
+        loading={loading}
+        onSelect={mode === "region" ? onPickArea : onSelect}
+        emptyHint={
+          isMac && mode === "window" && windowSources.length === 0
+            ? "No windows listed — fullscreen apps are usually only available as a Screen on macOS."
+            : undefined
+        }
       />
+
+      {isMac && mode === "window" ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Fullscreen apps usually do not appear under Window — pick Screen instead.
+        </p>
+      ) : null}
     </RecorderPanel>
   );
 }
@@ -136,23 +155,18 @@ function AreaPickSection({
   const targetId =
     selectedId && sources.some((source) => source.id === selectedId)
       ? selectedId
-      : sources[0]?.id;
+      : sources.find((source) => source.kind === "screen")?.id ?? sources[0]?.id;
   const canPick = Boolean(targetId) && !disabled && !pickingArea;
 
   return (
     <div className="ceer-accent-surface-strong flex flex-col gap-3 rounded-xl p-3.5">
-      <div className="flex items-start gap-2.5">
-        <span className="ceer-icon-well ceer-icon-well--strong flex size-8 shrink-0 items-center justify-center rounded-lg">
-          <SquareIcon className="size-4" weight="duotone" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Snip a region</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {sources.length === 0
-              ? "Refresh sources, then pick a screen or window."
-              : "Opens an overlay — switch targets there, then draw a crop region."}
-          </p>
-        </div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Draw a region</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+          {sources.length === 0
+            ? "Refresh sources, then pick a screen."
+            : "Opens an overlay — choose a display, then drag a crop."}
+        </p>
       </div>
       <Button
         type="button"
@@ -162,7 +176,7 @@ function AreaPickSection({
         disabled={!canPick}
         onClick={() => targetId && onPickArea(targetId)}
       >
-        {pickingArea ? "Drawing…" : areaSourceId === targetId ? "Redraw area" : "Select area"}
+        {pickingArea ? "Drawing…" : areaSourceId === targetId ? "Redraw region" : "Select region"}
       </Button>
     </div>
   );
@@ -185,7 +199,7 @@ function SourceGrid({
   if (sources.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
-        {emptyHint ?? "Nothing here. Try another tab?"}
+        {emptyHint ?? "Nothing here. Try another mode."}
       </p>
     );
   }

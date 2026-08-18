@@ -1,5 +1,6 @@
-import { RecordIcon } from "@phosphor-icons/react";
+import { GearSixIcon, RecordIcon } from "@phosphor-icons/react";
 
+import { Button } from "~/components/ui/button";
 import { ThemeToggle } from "~/components/theme-toggle";
 import { UpdateControls } from "~/components/recorder/update-controls";
 import { Badge } from "~/components/ui/badge";
@@ -10,6 +11,7 @@ import { useRecorderPlatformContext } from "~/components/recorder/recorder-platf
 
 interface RecorderHeaderProps {
   readonly phase: RecorderPhase;
+  readonly onOpenSettings?: () => void;
 }
 
 const phaseLabel: Record<RecorderPhase, string> = {
@@ -20,7 +22,7 @@ const phaseLabel: Record<RecorderPhase, string> = {
   stopped: "Clip ready",
 };
 
-export function RecorderHeader({ phase }: RecorderHeaderProps) {
+export function RecorderHeader({ phase, onOpenSettings }: RecorderHeaderProps) {
   const { platform, isWeb } = useRecorderPlatformContext();
   return (
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/50 pb-5">
@@ -32,7 +34,7 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
           <p className="font-heading text-[10px] tracking-[0.35em] text-ceer-lime-accent uppercase">
             Ceer
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Pixel trap</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Studio</h1>
           <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
             {recorderSubtitle(platform)}
           </p>
@@ -42,6 +44,18 @@ export function RecorderHeader({ phase }: RecorderHeaderProps) {
       <div className="flex flex-wrap items-center gap-2">
         <UpdateControls />
         <ThemeToggle />
+        {onOpenSettings ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+            title="Settings"
+          >
+            <GearSixIcon weight="duotone" />
+          </Button>
+        ) : null}
         {isWeb ? (
           <Badge variant="outline" className="font-mono text-[10px] tracking-wide uppercase">
             Browser

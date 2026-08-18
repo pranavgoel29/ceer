@@ -109,14 +109,14 @@ export function stageIdleHint(platform: CapturePlatform): string {
   if (isWeb(platform)) {
     return "Share a screen, window, or tab to see a live preview here.";
   }
-  return "Select a screen or window on the left, or snip a custom region.";
+  return "Select a screen or window, or draw a region.";
 }
 
 export function recorderSubtitle(platform: CapturePlatform): string {
   if (isWeb(platform)) {
-    return "Share a screen, window, or tab in your browser — then roll tape and export.";
+    return "Share a screen, window, or tab — preview, record, export.";
   }
-  return "Capture screens, windows, or a custom region — then roll tape and export.";
+  return "Pick a display, window, or region — preview, record, export.";
 }
 
 export const WEB_SYSTEM_AUDIO_HINT =

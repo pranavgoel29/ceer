@@ -249,8 +249,8 @@ export function RecordControls(props: RecordControlsProps) {
   return (
     <RecorderPanel
       eyebrow="Controls"
-      title="Audio & record"
-      description="Mix inputs, roll tape, export when you're done."
+      title="Record"
+      description="Mix audio, capture, then export the clip."
       accent="coral"
       tilt="right"
       contentClassName="gap-5"
@@ -311,10 +311,10 @@ export function RecordControls(props: RecordControlsProps) {
               <>
                 <RecordIcon weight="fill" />
                 {phase === "armed"
-                  ? "Roll tape"
+                  ? "Start recording"
                   : isWeb
                     ? "Share a target first"
-                    : "Arm a source first"}
+                    : "Choose a source first"}
               </>
             )}
           </Button>
@@ -322,8 +322,8 @@ export function RecordControls(props: RecordControlsProps) {
             {isStopping
               ? "Wrapping up your clip…"
               : isRecording
-                ? "Capturing. Finish when the bit is done."
-                : "Preview must be live before recording."}
+                ? "Capturing — stop when you’re done."
+                : "Live preview required before recording."}
           </p>
         </div>
       </PanelSection>

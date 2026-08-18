@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CaptureRegion, CaptureRegionPickResult, CaptureSourceRef } from "@ceer/contracts";
 
+import { desktopSettingDefaults, readAppSettings } from "~/lib/app-settings";
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
 import { cropVideoStream } from "~/lib/crop-video-stream";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
@@ -84,8 +85,12 @@ export function useDesktopRecorder(): DesktopRecorderApi {
   const [recording, setRecording] = useState<RecordingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(
+    () => readAppSettings(desktopSettingDefaults()).micEnabled,
+  );
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState(
+    () => readAppSettings(desktopSettingDefaults()).systemAudioEnabled,
+  );
   const [armedSourceId, setArmedSourceId] = useState<string | null>(null);
   const [captureRegion, setCaptureRegion] = useState<CaptureRegion | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -248,7 +253,10 @@ export function useDesktopRecorder(): DesktopRecorderApi {
   );
 
   useEffect(() => {
-    bridge?.setCapturePreferences({ systemAudioEnabled });
+    bridge?.setCapturePreferences({
+      systemAudioEnabled,
+      hideMainWhileRecording: readAppSettings(desktopSettingDefaults()).hideMainWhileRecording,
+    });
   }, [bridge, systemAudioEnabled]);
 
   const armPreview = useCallback(
@@ -273,7 +281,10 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       setPreviewLoading(true);
 
       if (bridge) {
-        bridge.setCapturePreferences({ systemAudioEnabled: systemAudioEnabledRef.current });
+        bridge.setCapturePreferences({
+          systemAudioEnabled: systemAudioEnabledRef.current,
+          hideMainWhileRecording: readAppSettings(desktopSettingDefaults()).hideMainWhileRecording,
+        });
         bridge.setCaptureSource(source);
       }
 

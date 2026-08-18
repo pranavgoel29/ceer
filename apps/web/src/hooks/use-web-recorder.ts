@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WebRecorderApi } from "~/hooks/recorder-api";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
+import { readAppSettings, webSettingDefaults } from "~/lib/app-settings";
 import {
   captureSourceRefFromDisplayStream,
   isFirefox,
@@ -32,8 +33,12 @@ export function useWebRecorder(): WebRecorderApi {
   const [recording, setRecording] = useState<RecordingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [micEnabled, setMicEnabled] = useState(false);
-  const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(
+    () => readAppSettings(webSettingDefaults()).micEnabled,
+  );
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState(
+    () => readAppSettings(webSettingDefaults()).systemAudioEnabled,
+  );
   const [webShareLabel, setWebShareLabel] = useState<string | null>(null);
   const [micAttaching, setMicAttaching] = useState(false);
   const [shareAudioNoticeText, setShareAudioNoticeText] = useState<string | null>(null);
