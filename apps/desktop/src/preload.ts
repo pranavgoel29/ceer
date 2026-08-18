@@ -29,6 +29,8 @@ const desktopBridge: DesktopBridge = {
   relaunchApp: () => ipcRenderer.invoke(IpcChannels.RELAUNCH_APP_CHANNEL),
   pickCaptureRegion: (sourceId) =>
     ipcRenderer.invoke(IpcChannels.PICK_CAPTURE_REGION_CHANNEL, sourceId),
+  resolveWindowCapture: (source) =>
+    ipcRenderer.invoke(IpcChannels.RESOLVE_WINDOW_CAPTURE_CHANNEL, source),
   publishRecorderState: (state: RecorderRemoteState) => {
     ipcRenderer.send(IpcChannels.RECORDER_STATE_PUBLISH_CHANNEL, state);
   },

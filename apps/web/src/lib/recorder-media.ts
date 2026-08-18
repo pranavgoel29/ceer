@@ -107,6 +107,10 @@ export function stopStreamTracks(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
+export function stopVideoTracks(stream: MediaStream | null) {
+  stream?.getVideoTracks().forEach((track) => track.stop());
+}
+
 export function attachMicTrack(displayStream: MediaStream, micTrack: MediaStreamTrack) {
   if (!displayStream.getTracks().includes(micTrack)) {
     displayStream.addTrack(micTrack);

@@ -4,7 +4,8 @@ import type { CaptureRegion, CaptureRegionPickResult, CaptureSourceRef } from "@
 
 import { desktopSettingDefaults, readAppSettings } from "~/lib/app-settings";
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
-import { cropVideoStream } from "~/lib/crop-video-stream";
+import { createCroppedStream, type CropStreamHandle } from "~/lib/crop-video-stream";
+import { isMissionControlTransform } from "~/lib/window-capture-follow";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
 import { PREVIEW_LOADING_MIN_MS, waitForMinDuration } from "~/lib/min-duration";
@@ -17,6 +18,7 @@ import {
   startRecorder,
   stopRecorder,
   stopStreamTracks,
+  stopVideoTracks,
 } from "~/lib/recorder-media";
 import { finalizeChunks } from "~/lib/recorder-session";
 
@@ -110,6 +112,11 @@ export function useDesktopRecorder(): DesktopRecorderApi {
   const displayStreamRef = useRef<MediaStream | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
   const cropCleanupRef = useRef<(() => void) | null>(null);
+  const cropHandleRef = useRef<CropStreamHandle | null>(null);
+  const followWindowRef = useRef<CaptureSourceRef | null>(null);
+  const cropBaselineRef = useRef<CaptureRegion | null>(null);
+  const captureTargetRef = useRef<CaptureSourceRef | null>(null);
+  const rebindInFlightRef = useRef(false);
   const micStreamsRef = useRef<MediaStream[]>([]);
   const regionPickRef = useRef<CaptureRegionPickResult | null>(null);
   const armedSourceRef = useRef<CaptureSourceRef | null>(null);
@@ -131,6 +138,7 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     audioCleanupRef.current = null;
     cropCleanupRef.current?.();
     cropCleanupRef.current = null;
+    cropHandleRef.current = null;
     for (const stream of micStreamsRef.current) {
       stopStreamTracks(stream);
     }
@@ -142,6 +150,7 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     audioCleanupRef.current = null;
     cropCleanupRef.current?.();
     cropCleanupRef.current = null;
+    cropHandleRef.current = null;
 
     const displayStream = displayStreamRef.current;
     const preview = previewStreamRef.current;
@@ -176,6 +185,9 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     setArmedSourceId(null);
     setCaptureRegion(null);
     regionPickRef.current = null;
+    followWindowRef.current = null;
+    cropBaselineRef.current = null;
+    captureTargetRef.current = null;
     armedSourceRef.current = null;
     startedAtRef.current = null;
     clearTimer();
@@ -220,17 +232,14 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       );
       audioCleanupRef.current = audioCleanup;
 
-      if (!regionPick) {
-        return mixed;
+      if (regionPick) {
+        const handle = await createCroppedStream(mixed, regionPick.region, regionPick.display);
+        cropHandleRef.current = handle;
+        cropCleanupRef.current = handle.cleanup;
+        return handle.stream;
       }
 
-      const { stream: cropped, cleanup: cropCleanup } = await cropVideoStream(
-        mixed,
-        regionPick.region,
-        regionPick.display,
-      );
-      cropCleanupRef.current = cropCleanup;
-      return cropped;
+      return mixed;
     },
     [buildAudioStreams],
   );
@@ -264,8 +273,30 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       regionPickRef.current =
         regionPick === undefined ? regionPickRef.current : (regionPick ?? null);
 
-      const activeRegionPick = regionPickRef.current;
       const armGeneration = ++armGenerationRef.current;
+      const requestedSource = source;
+      let captureTarget = source;
+      let activeRegionPick = regionPickRef.current;
+      followWindowRef.current = null;
+
+      if (
+        source.kind === "window" &&
+        !activeRegionPick &&
+        bridge?.getAppInfo().platform === "darwin"
+      ) {
+        const plan = await bridge.resolveWindowCapture(source);
+        if (!isActiveArm(armGeneration)) {
+          return;
+        }
+        if (plan) {
+          captureTarget = plan.screen;
+          activeRegionPick = plan.pick;
+          regionPickRef.current = plan.pick;
+          followWindowRef.current = requestedSource;
+          cropBaselineRef.current = plan.pick.region;
+        }
+      }
+
       audioMixGenerationRef.current += 1;
       const loadingStartedAt = Date.now();
 
@@ -285,8 +316,9 @@ export function useDesktopRecorder(): DesktopRecorderApi {
           systemAudioEnabled: systemAudioEnabledRef.current,
           hideMainWhileRecording: readAppSettings(desktopSettingDefaults()).hideMainWhileRecording,
         });
-        bridge.setCaptureSource(source);
+        bridge.setCaptureSource(captureTarget);
       }
+      captureTargetRef.current = captureTarget;
 
       try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -310,8 +342,8 @@ export function useDesktopRecorder(): DesktopRecorderApi {
 
         previewStreamRef.current = outputStream;
         setPreviewStream(outputStream);
-        setArmedSourceId(source.id);
-        armedSourceRef.current = source;
+        setArmedSourceId(requestedSource.id);
+        armedSourceRef.current = requestedSource;
         setCaptureRegion(activeRegionPick?.region ?? null);
         setPhase("armed");
         attachShareEnded(displayStream, armGeneration);
@@ -342,6 +374,76 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       releaseAudioResources,
       releasePreviewOutput,
     ],
+  );
+
+  const rebindCapture = useCallback(
+    async (source: CaptureSourceRef) => {
+      const phase = phaseRef.current;
+      if (phase !== "armed" && phase !== "recording") {
+        return;
+      }
+      if (rebindInFlightRef.current || previewLoading) {
+        return;
+      }
+
+      armedSourceRef.current = source;
+      setArmedSourceId(source.id);
+      followWindowRef.current = source.kind === "window" ? source : null;
+
+      if (source.kind !== "window" || bridge?.getAppInfo().platform !== "darwin") {
+        if (phase === "armed") {
+          await armPreview(source);
+        }
+        return;
+      }
+
+      const plan = await bridge.resolveWindowCapture(source);
+      if (!plan) {
+        return;
+      }
+
+      cropBaselineRef.current = plan.pick.region;
+      regionPickRef.current = plan.pick;
+      cropHandleRef.current?.setFrozen(false);
+      cropHandleRef.current?.setRegion(plan.pick.region, plan.pick.display);
+      setCaptureRegion(plan.pick.region);
+
+      if (captureTargetRef.current?.id === plan.screen.id) {
+        bridge.setCaptureSource(plan.screen);
+        return;
+      }
+
+      rebindInFlightRef.current = true;
+      try {
+        bridge.setCaptureSource(plan.screen);
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: systemAudioEnabledRef.current,
+        });
+
+        if (phaseRef.current !== "armed" && phaseRef.current !== "recording") {
+          stopStreamTracks(displayStream);
+          return;
+        }
+
+        const previous = displayStreamRef.current;
+        const previousTrack = previous?.getVideoTracks()[0];
+        if (previousTrack) {
+          previousTrack.onended = null;
+        }
+
+        displayStreamRef.current = displayStream;
+        captureTargetRef.current = plan.screen;
+        await cropHandleRef.current?.replaceVideo(displayStream);
+        stopVideoTracks(previous);
+        attachShareEnded(displayStream, armGenerationRef.current);
+      } catch {
+        // Keep the current capture if macOS rejects the replacement stream.
+      } finally {
+        rebindInFlightRef.current = false;
+      }
+    },
+    [armPreview, attachShareEnded, bridge, previewLoading],
   );
 
   const applyAudioPreferences = useCallback(async () => {
@@ -556,6 +658,46 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     });
   }, [bridge, startRecording, stopRecording]);
 
+  useEffect(() => {
+    if (!bridge || bridge.getAppInfo().platform !== "darwin") {
+      return;
+    }
+    if (phase !== "armed" && phase !== "recording") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      const windowRef = followWindowRef.current;
+      const baseline = cropBaselineRef.current;
+      const handle = cropHandleRef.current;
+      if (!windowRef || !baseline || !handle) {
+        return;
+      }
+
+      void bridge.resolveWindowCapture(windowRef).then((plan) => {
+        if (!plan || followWindowRef.current?.id !== windowRef.id) {
+          return;
+        }
+        const region = plan.pick.region;
+        if (isMissionControlTransform(baseline, region)) {
+          handle.setFrozen(true);
+          return;
+        }
+        handle.setFrozen(false);
+        handle.setRegion(region, plan.pick.display);
+        setCaptureRegion(region);
+        const sizeStable =
+          Math.abs(region.width - baseline.width) <= 8 &&
+          Math.abs(region.height - baseline.height) <= 8;
+        cropBaselineRef.current = sizeStable
+          ? { ...baseline, x: region.x, y: region.y }
+          : region;
+      });
+    }, 160);
+
+    return () => window.clearInterval(timer);
+  }, [bridge, phase, armedSourceId]);
+
   return {
     platform: "desktop",
     phase,
@@ -574,6 +716,7 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     setMicEnabled,
     setSystemAudioEnabled,
     armPreview,
+    rebindCapture,
     applyAudioPreferences,
     startRecording,
     stopRecording,

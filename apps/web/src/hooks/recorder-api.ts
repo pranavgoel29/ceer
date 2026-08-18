@@ -36,6 +36,8 @@ export type DesktopRecorderApi = RecorderCore & {
     regionPick?: CaptureRegionPickResult | null,
   ) => Promise<void>;
   readonly applyAudioPreferences: () => Promise<void>;
+  /** Re-attach capture after macOS Exposé/Mission Control churns window ids. */
+  readonly rebindCapture: (source: CaptureSourceRef) => Promise<void>;
 };
 
 export type WebRecorderApi = RecorderCore & {

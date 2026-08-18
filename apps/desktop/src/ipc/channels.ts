@@ -9,6 +9,7 @@ export const OPEN_PRIVACY_SETTINGS_CHANNEL = "ceer:open-privacy-settings" as con
 export const RELAUNCH_APP_CHANNEL = "ceer:relaunch-app" as const;
 export const SET_CAPTURE_PREFERENCES_CHANNEL = "ceer:set-capture-preferences" as const;
 export const PICK_CAPTURE_REGION_CHANNEL = "ceer:pick-capture-region" as const;
+export const RESOLVE_WINDOW_CAPTURE_CHANNEL = "ceer:resolve-window-capture" as const;
 export const AREA_PICKER_COMPLETE_CHANNEL = "ceer:area-picker-complete" as const;
 export const AREA_PICKER_CANCEL_CHANNEL = "ceer:area-picker-cancel" as const;
 export const GET_AREA_PICKER_BACKGROUND_CHANNEL = "ceer:get-area-picker-background" as const;

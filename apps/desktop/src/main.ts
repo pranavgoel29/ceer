@@ -14,6 +14,7 @@ import {
 import { registerDisplayMediaHandler } from "./display-media-handler.ts";
 import * as IpcChannels from "./ipc/channels.ts";
 import { listDesktopSources } from "./list-desktop-sources.ts";
+import { resolveWindowCapture } from "./resolve-window-capture.ts";
 import {
   getPermissionStatus,
   openPrivacySettings,
@@ -108,6 +109,9 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IpcChannels.GET_DESKTOP_SOURCES_CHANNEL, () => listDesktopSources());
+  ipcMain.handle(IpcChannels.RESOLVE_WINDOW_CAPTURE_CHANNEL, (_event, source: CaptureSourceRef) =>
+    resolveWindowCapture(source),
+  );
 
   ipcMain.on(IpcChannels.SET_CAPTURE_SOURCE_CHANNEL, (event, source: CaptureSourceRef | null) => {
     setSelectedCaptureSource(source);
