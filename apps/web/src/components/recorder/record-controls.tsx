@@ -1,17 +1,18 @@
 import {
-  DownloadSimpleIcon,
-  ExportIcon,
+  FilmStripIcon,
+  FrameCornersIcon,
   MicrophoneIcon,
   RecordIcon,
   SpeakerHighIcon,
   StopIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 
 import { Button } from "~/components/ui/button";
-import { Label } from "~/components/ui/label";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
+import { Separator } from "~/components/ui/separator";
+import { Switch } from "~/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -19,20 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Separator } from "~/components/ui/separator";
-import { Switch } from "~/components/ui/switch";
-import { useRecordingExport } from "~/hooks/use-recording-export";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
+import { useAppSettings } from "~/hooks/use-app-settings";
 import { DESKTOP_SYSTEM_AUDIO_HINT, WEB_SYSTEM_AUDIO_HINT } from "~/lib/capture-platform";
 import { useRecorderPlatformContext } from "~/components/recorder/recorder-platform-context";
-import { formatBytes, formatDuration } from "~/lib/format";
-import {
-  EXPORT_FORMATS,
-  EXPORT_RESOLUTIONS,
-  type ExportFormat,
-  type ExportResolution,
-} from "~/lib/recording-options";
 import { cn } from "~/lib/utils";
+import {
+  CAPTURE_FRAME_RATES,
+  CAPTURE_RESOLUTIONS,
+  isCaptureFrameRate,
+  isCaptureResolution,
+} from "~/lib/video-quality";
 
 interface RecordControlsProps {
   readonly phase: RecorderPhase;
@@ -99,131 +97,6 @@ function AudioToggleRow({
   );
 }
 
-function ExportSection({
-  recording,
-  onDiscard,
-}: {
-  readonly recording: RecordingResult;
-  readonly onDiscard: () => void;
-}) {
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("mp4");
-  const [exportResolution, setExportResolution] = useState<ExportResolution>("source");
-  const { exporting, exportProgress, exportError, runExport, downloadBlob, resetExportState } =
-    useRecordingExport();
-
-  const handleDiscard = () => {
-    resetExportState();
-    onDiscard();
-  };
-
-  const handleExport = async () => {
-    const blob = await runExport(recording.blob, exportFormat, exportResolution);
-    if (blob) {
-      downloadBlob(blob, exportFormat);
-    }
-  };
-
-  const progressPercent = Math.round(exportProgress * 100);
-
-  return (
-    <PanelSection title="Export">
-      <div className="ceer-export-panel flex flex-col gap-4 rounded-xl p-3.5 text-sm">
-        <p className="text-muted-foreground">
-          {formatDuration(recording.durationMs)} · {formatBytes(recording.blob.size)} · master WebM
-        </p>
-
-        <div className="grid grid-cols-1 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="export-format" className="text-[11px] text-muted-foreground">
-              Format
-            </Label>
-            <Select
-              value={exportFormat}
-              onValueChange={(value) => setExportFormat(value as ExportFormat)}
-              disabled={exporting}
-            >
-              <SelectTrigger id="export-format" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXPORT_FORMATS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="export-resolution" className="text-[11px] text-muted-foreground">
-              Resolution
-            </Label>
-            <Select
-              value={exportResolution}
-              onValueChange={(value) => setExportResolution(value as ExportResolution)}
-              disabled={exporting}
-            >
-              <SelectTrigger id="export-resolution" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXPORT_RESOLUTIONS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {exporting ? (
-          <div className="flex flex-col gap-1.5">
-            <progress
-              className="export-progress h-1.5 w-full overflow-hidden rounded-full"
-              value={exportProgress}
-              max={1}
-              aria-label="Export progress"
-            />
-            <p className="text-[11px] text-muted-foreground">Exporting… {progressPercent}%</p>
-          </div>
-        ) : null}
-
-        {exportError ? <p className="text-xs text-destructive">{exportError}</p> : null}
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button variant="outline" size="sm" className="flex-1" onClick={handleDiscard} disabled={exporting}>
-            <TrashIcon />
-            Discard
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1"
-            nativeButton={false}
-            render={
-              <a
-                href={recording.url}
-                download={`ceer-${Date.now()}.webm`}
-                aria-label="Download master WebM recording"
-              >
-                <DownloadSimpleIcon aria-hidden />
-                WebM
-              </a>
-            }
-            disabled={exporting}
-          />
-          <Button size="sm" className="flex-1" onClick={() => void handleExport()} disabled={exporting}>
-            <ExportIcon />
-            {exporting ? "Exporting…" : "Export"}
-          </Button>
-        </div>
-      </div>
-    </PanelSection>
-  );
-}
-
 export function RecordControls(props: RecordControlsProps) {
   const {
     phase,
@@ -244,17 +117,88 @@ export function RecordControls(props: RecordControlsProps) {
   const isActiveCapture = isRecording || isStopping;
   const isStopped = phase === "stopped" && recording !== null;
   const togglesDisabled = togglesDisabledProp || isActiveCapture;
-  const { isWeb } = useRecorderPlatformContext();
+  const { isWeb, isDesktop } = useRecorderPlatformContext();
+  const { settings, patch } = useAppSettings(isDesktop);
+  const pictureLocked = isActiveCapture;
 
   return (
     <RecorderPanel
       eyebrow="Controls"
-      title="Record"
-      description="Mix audio, capture, then export the clip."
+      title={isStopped ? "Take ready" : "Record"}
+      description={
+        isStopped
+          ? "Trim on the stage, or throw this take out and start another."
+          : "Mix audio, capture, then cut the clip."
+      }
       accent="coral"
       tilt="right"
       contentClassName="gap-5"
     >
+      <PanelSection title="Picture">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <FrameCornersIcon className="size-3.5" />
+              Resolution
+            </span>
+            <Select
+              value={settings.captureResolution}
+              disabled={pictureLocked}
+              onValueChange={(value) => {
+                if (isCaptureResolution(value)) {
+                  patch({ captureResolution: value });
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Capture resolution" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTURE_RESOLUTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <FilmStripIcon className="size-3.5" />
+              Frame rate
+            </span>
+            <Select
+              value={String(settings.captureFrameRate)}
+              disabled={pictureLocked}
+              onValueChange={(value) => {
+                const next = Number(value);
+                if (isCaptureFrameRate(next)) {
+                  patch({ captureFrameRate: next });
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Capture frame rate" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTURE_FRAME_RATES.map((item) => (
+                  <SelectItem key={item.value} value={String(item.value)}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {phase === "armed"
+            ? "Applies on the next source pick or share so the encoder can lock a clean size."
+            : "Native + 60 fps keeps motion sharp. Lower the cap if the file size gets large."}
+        </p>
+      </PanelSection>
+
+      <Separator className="opacity-60" />
+
       <PanelSection title="Audio mix">
         <div className="flex flex-col gap-2">
           <AudioToggleRow
@@ -331,7 +275,15 @@ export function RecordControls(props: RecordControlsProps) {
       {isStopped && recording ? (
         <>
           <Separator className="opacity-60" />
-          <ExportSection recording={recording} onDiscard={onDiscard} />
+          <PanelSection title="Take">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Preview and trim live on the stage. Export keeps only the cut.
+            </p>
+            <Button variant="outline" className="w-full" onClick={onDiscard}>
+              <TrashIcon />
+              New take
+            </Button>
+          </PanelSection>
         </>
       ) : null}
     </RecorderPanel>

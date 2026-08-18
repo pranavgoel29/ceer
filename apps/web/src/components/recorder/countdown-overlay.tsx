@@ -1,4 +1,4 @@
-import { Button } from "~/components/ui/button";
+import { useEffect } from "react";
 
 interface CountdownOverlayProps {
   readonly remaining: number;
@@ -6,18 +6,32 @@ interface CountdownOverlayProps {
 }
 
 export function CountdownOverlay({ remaining, onCancel }: CountdownOverlayProps) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
   return (
-    <div className="ceer-countdown-scrim fixed inset-0 z-50 flex flex-col items-center justify-center gap-6">
-      <p
-        key={remaining}
-        className="ceer-countdown-number font-heading text-[min(28vw,180px)] leading-none font-semibold tabular-nums"
-      >
-        {remaining}
-      </p>
-      <p className="text-sm text-muted-foreground">Recording starts after this beat</p>
-      <Button type="button" variant="outline" onClick={onCancel}>
+    <div className="ceer-countdown">
+      <div className="ceer-countdown-slate">
+        <p className="ceer-countdown-kicker">Stand by</p>
+        <p key={remaining} className="ceer-countdown-digit">
+          {remaining}
+        </p>
+        <div className="ceer-countdown-pips" aria-hidden>
+          {[3, 2, 1].map((beat) => (
+            <span key={beat} className={beat === remaining ? "is-current" : beat > remaining ? "is-past" : ""} />
+          ))}
+        </div>
+      </div>
+      <button type="button" className="ceer-countdown-abort" onClick={onCancel}>
         Cancel
-      </Button>
+      </button>
     </div>
   );
 }

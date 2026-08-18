@@ -15,7 +15,6 @@ interface RecordStageProps {
   readonly previewLoading: boolean;
   readonly loadingMessage: string;
   readonly previewStream: MediaStream | null;
-  readonly recordingUrl: string | null;
   readonly elapsedMs: number;
   readonly captureRegion: CaptureRegion | null;
 }
@@ -41,7 +40,7 @@ function phaseBadgeLabel(
     case "stopping":
       return "Finishing";
     case "stopped":
-      return "Playback";
+      return "Ready";
     default:
       return phase;
   }
@@ -52,7 +51,6 @@ export function RecordStage({
   previewLoading,
   loadingMessage,
   previewStream,
-  recordingUrl,
   elapsedMs,
   captureRegion,
 }: RecordStageProps) {
@@ -74,9 +72,7 @@ export function RecordStage({
     node.srcObject = null;
   }, [previewStream]);
 
-  const isLive =
-    phase === "armed" || phase === "recording" || phase === "stopping";
-  const showPlayback = phase === "stopped" && recordingUrl;
+  const isLive = phase === "armed" || phase === "recording" || phase === "stopping";
 
   return (
     <RecorderPanel
@@ -106,11 +102,7 @@ export function RecordStage({
           phase === "recording" && "ceer-rec-frame",
         )}
       >
-        {showPlayback ? (
-          <video src={recordingUrl} controls className="size-full object-contain" />
-        ) : (
-          <video ref={videoRef} muted playsInline className="size-full object-contain" />
-        )}
+        <video ref={videoRef} muted playsInline className="size-full object-contain" />
 
         {previewLoading ? (
           <div className="ceer-stage-overlay-loading absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center backdrop-blur-[2px]">
@@ -122,16 +114,14 @@ export function RecordStage({
               <p className="text-xs leading-relaxed text-muted-foreground">{loadingMessage}</p>
             </div>
           </div>
-        ) : !isLive && !showPlayback ? (
+        ) : !isLive ? (
           <div className="ceer-stage-overlay-idle absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center backdrop-blur-[1px]">
             <span className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-muted-foreground shadow-sm">
               <FilmSlateIcon className="size-7" weight="duotone" />
             </span>
             <div className="max-w-xs space-y-1">
               <p className="text-sm font-medium">No signal yet</p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {stageIdleHint(platform)}
-              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{stageIdleHint(platform)}</p>
             </div>
           </div>
         ) : null}

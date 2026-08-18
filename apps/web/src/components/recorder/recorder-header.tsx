@@ -19,7 +19,7 @@ const phaseLabel: Record<RecorderPhase, string> = {
   armed: "Preview live",
   recording: "Recording",
   stopping: "Finishing",
-  stopped: "Clip ready",
+  stopped: "Cut ready",
 };
 
 export function RecorderHeader({ phase, onOpenSettings }: RecorderHeaderProps) {
@@ -34,9 +34,13 @@ export function RecorderHeader({ phase, onOpenSettings }: RecorderHeaderProps) {
           <p className="font-heading text-[10px] tracking-[0.35em] text-ceer-lime-accent uppercase">
             Ceer
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Studio</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {phase === "stopped" ? "Cutting room" : "Studio"}
+          </h1>
           <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
-            {recorderSubtitle(platform)}
+            {phase === "stopped"
+              ? "Preview the take, split picture and sound, then export."
+              : recorderSubtitle(platform)}
           </p>
         </div>
       </div>

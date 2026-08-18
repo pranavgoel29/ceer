@@ -4,7 +4,7 @@ import type { CaptureRegion, CaptureRegionPickResult, CaptureSourceRef } from "@
 
 import { desktopSettingDefaults, readAppSettings } from "~/lib/app-settings";
 import { attachAudioToVideoStream } from "~/lib/audio-mix";
-import { createCroppedStream, type CropStreamHandle } from "~/lib/crop-video-stream";
+import { createCroppedStream, createScaledStream, type CropStreamHandle } from "~/lib/crop-video-stream";
 import { isMissionControlTransform } from "~/lib/window-capture-follow";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
@@ -20,6 +20,12 @@ import {
   stopStreamTracks,
   stopVideoTracks,
 } from "~/lib/recorder-media";
+import {
+  captureMaxHeight,
+  prepareCaptureVideoTrack,
+  trackExceedsResolution,
+  videoConstraintsForQuality,
+} from "~/lib/video-quality";
 import { finalizeChunks } from "~/lib/recorder-session";
 
 function micPermissionMessage(): string {
@@ -233,10 +239,21 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       audioCleanupRef.current = audioCleanup;
 
       if (regionPick) {
-        const handle = await createCroppedStream(mixed, regionPick.region, regionPick.display);
+        const handle = await createCroppedStream(mixed, regionPick.region, regionPick.display, {
+          resolution: readAppSettings(desktopSettingDefaults()).captureResolution,
+        });
         cropHandleRef.current = handle;
         cropCleanupRef.current = handle.cleanup;
         return handle.stream;
+      }
+
+      const quality = readAppSettings(desktopSettingDefaults());
+      const videoTrack = mixed.getVideoTracks()[0];
+      const maxHeight = captureMaxHeight(quality.captureResolution);
+      if (videoTrack && maxHeight && trackExceedsResolution(videoTrack, quality.captureResolution)) {
+        const scaled = await createScaledStream(mixed, maxHeight);
+        cropCleanupRef.current = scaled.cleanup;
+        return scaled.stream;
       }
 
       return mixed;
@@ -321,10 +338,19 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       captureTargetRef.current = captureTarget;
 
       try {
+        const quality = readAppSettings(desktopSettingDefaults());
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: videoConstraintsForQuality(quality.captureResolution, quality.captureFrameRate),
           audio: systemAudioEnabledRef.current,
         });
+        const videoTrack = displayStream.getVideoTracks()[0];
+        if (videoTrack) {
+          await prepareCaptureVideoTrack(
+            videoTrack,
+            quality.captureResolution,
+            quality.captureFrameRate,
+          );
+        }
 
         if (!isActiveArm(armGeneration)) {
           stopStreamTracks(displayStream);
@@ -416,10 +442,19 @@ export function useDesktopRecorder(): DesktopRecorderApi {
       rebindInFlightRef.current = true;
       try {
         bridge.setCaptureSource(plan.screen);
+        const quality = readAppSettings(desktopSettingDefaults());
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: videoConstraintsForQuality(quality.captureResolution, quality.captureFrameRate),
           audio: systemAudioEnabledRef.current,
         });
+        const replacementTrack = displayStream.getVideoTracks()[0];
+        if (replacementTrack) {
+          await prepareCaptureVideoTrack(
+            replacementTrack,
+            quality.captureResolution,
+            quality.captureFrameRate,
+          );
+        }
 
         if (phaseRef.current !== "armed" && phaseRef.current !== "recording") {
           stopStreamTracks(displayStream);
@@ -646,17 +681,11 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     }
 
     return bridge.onRecorderCommand((command) => {
-      if (command === "start") {
-        startRecording();
-      }
       if (command === "stop") {
         stopRecording();
       }
-      if (command === "show-main") {
-        // Main process restores the window; no renderer action needed.
-      }
     });
-  }, [bridge, startRecording, stopRecording]);
+  }, [bridge, stopRecording]);
 
   useEffect(() => {
     if (!bridge || bridge.getAppInfo().platform !== "darwin") {

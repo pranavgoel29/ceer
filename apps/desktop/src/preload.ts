@@ -31,6 +31,22 @@ const desktopBridge: DesktopBridge = {
     ipcRenderer.invoke(IpcChannels.PICK_CAPTURE_REGION_CHANNEL, sourceId),
   resolveWindowCapture: (source) =>
     ipcRenderer.invoke(IpcChannels.RESOLVE_WINDOW_CAPTURE_CHANNEL, source),
+  showDisplayCountdown: (remaining: number) => {
+    ipcRenderer.send(IpcChannels.COUNTDOWN_SHOW_CHANNEL, remaining);
+  },
+  updateDisplayCountdown: (remaining: number) => {
+    ipcRenderer.send(IpcChannels.COUNTDOWN_UPDATE_CHANNEL, remaining);
+  },
+  hideDisplayCountdown: () => {
+    ipcRenderer.send(IpcChannels.COUNTDOWN_HIDE_CHANNEL);
+  },
+  onDisplayCountdownCancelled: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(IpcChannels.COUNTDOWN_CANCEL_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.COUNTDOWN_CANCEL_CHANNEL, handler);
+    };
+  },
   publishRecorderState: (state: RecorderRemoteState) => {
     ipcRenderer.send(IpcChannels.RECORDER_STATE_PUBLISH_CHANNEL, state);
   },

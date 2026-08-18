@@ -45,6 +45,7 @@ const TRAY_ICON_FALLBACK_DATA_URL =
 let powerSaveBlockerId: number | null = null;
 let hudVisiblePreference = true;
 let areaPickerActive = false;
+let countdownOverlayActive = false;
 let controlBarShown = false;
 let appIsActive = true;
 
@@ -543,7 +544,7 @@ function isControlBarMenuVisible(): boolean {
 }
 
 function canShowControlWidget(): boolean {
-  if (areaPickerActive) {
+  if (areaPickerActive || countdownOverlayActive) {
     return false;
   }
 
@@ -575,6 +576,15 @@ function canPresentFloatingHud(): boolean {
 
 export function setAreaPickerActive(active: boolean): void {
   areaPickerActive = active;
+  if (active && controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
+    controlWidgetWindow.hide();
+    controlBarShown = false;
+  }
+  syncControlWidgetVisibility();
+}
+
+export function setCountdownOverlayActive(active: boolean): void {
+  countdownOverlayActive = active;
   if (active && controlWidgetWindow && !controlWidgetWindow.isDestroyed()) {
     controlWidgetWindow.hide();
     controlBarShown = false;

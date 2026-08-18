@@ -2,6 +2,8 @@ import {
   ArrowLeftIcon,
   ArrowSquareOutIcon,
   DesktopIcon,
+  FilmStripIcon,
+  FrameCornersIcon,
   InfoIcon,
   MicrophoneIcon,
   MonitorIcon,
@@ -15,12 +17,25 @@ import { useState, type ReactNode } from "react";
 import { UpdateControls } from "~/components/recorder/update-controls";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { useAppSettings } from "~/hooks/use-app-settings";
 import { useDesktopBridge } from "~/hooks/use-desktop-bridge";
 import { isAccessGranted, useDesktopPermissions } from "~/hooks/use-desktop-permissions";
 import { useDesktopUpdates } from "~/hooks/use-desktop-updates";
 import { useTheme } from "~/hooks/use-theme";
 import { cn } from "~/lib/utils";
+import {
+  CAPTURE_FRAME_RATES,
+  CAPTURE_RESOLUTIONS,
+  isCaptureFrameRate,
+  isCaptureResolution,
+} from "~/lib/video-quality";
 
 type SettingsTab = "general" | "capture" | "access" | "about";
 
@@ -183,6 +198,57 @@ function CapturePane({ isDesktop }: { isDesktop: boolean }) {
         title="Capture"
         description="Defaults applied when you open the studio. You can still override them per take."
       />
+      <SettingsRow
+        icon={FrameCornersIcon}
+        title="Display resolution"
+        description="Native keeps the full screen. Pick a cap if you want a smaller file without the default Chromium blur."
+      >
+        <Select
+          value={settings.captureResolution}
+          onValueChange={(value) => {
+            if (isCaptureResolution(value)) {
+              patch({ captureResolution: value });
+            }
+          }}
+        >
+          <SelectTrigger className="w-[9.5rem]" aria-label="Capture resolution">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CAPTURE_RESOLUTIONS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingsRow>
+      <SettingsRow
+        icon={FilmStripIcon}
+        title="Frame rate"
+        description="60 fps is smoother for cursor and scrolling. 30 fps is lighter on the encoder."
+      >
+        <Select
+          value={String(settings.captureFrameRate)}
+          onValueChange={(value) => {
+            const next = Number(value);
+            if (isCaptureFrameRate(next)) {
+              patch({ captureFrameRate: next });
+            }
+          }}
+        >
+          <SelectTrigger className="w-[9.5rem]" aria-label="Capture frame rate">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CAPTURE_FRAME_RATES.map((item) => (
+              <SelectItem key={item.value} value={String(item.value)}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingsRow>
       <SettingsRow
         icon={SpeakerHighIcon}
         title={isDesktop ? "System sounds" : "Shared audio"}

@@ -1,6 +1,6 @@
 export type ExportFormat = "webm" | "mp4" | "mov";
 
-export type ExportResolution = "source" | "720p" | "1080p" | "1440p";
+export type ExportResolution = "source" | "720p" | "1080p" | "1440p" | "2160p";
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; ext: string }[] = [
   { value: "webm", label: "WebM (original)", ext: "webm" },
@@ -13,6 +13,7 @@ export const EXPORT_RESOLUTIONS: { value: ExportResolution; label: string }[] = 
   { value: "720p", label: "720p" },
   { value: "1080p", label: "1080p" },
   { value: "1440p", label: "1440p" },
+  { value: "2160p", label: "4K (2160p)" },
 ];
 
 export function exportFileExtension(format: ExportFormat): string {
