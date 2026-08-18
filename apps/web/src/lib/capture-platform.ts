@@ -114,9 +114,9 @@ export function stageIdleHint(platform: CapturePlatform): string {
 
 export function recorderSubtitle(platform: CapturePlatform): string {
   if (isWeb(platform)) {
-    return "Share a screen, window, or tab — preview, record, export.";
+    return "Share a screen, window, or tab — then cut and export.";
   }
-  return "Pick a display, window, or region — preview, record, export.";
+  return "Pick a display, window, or region — then cut and export.";
 }
 
 export const WEB_SYSTEM_AUDIO_HINT =

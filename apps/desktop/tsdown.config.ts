@@ -33,4 +33,8 @@ export default defineConfig([
     ...shared,
     entry: ["src/control-widget-preload.ts"],
   },
+  {
+    ...shared,
+    entry: ["src/countdown-preload.ts"],
+  },
 ]);

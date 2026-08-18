@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
-import { exportRecording } from "~/lib/export-recording";
+import { exportRecording, type ClipExportTrim } from "~/lib/export-recording";
+import type { ExportSlice } from "~/lib/clip-edit";
 import {
   exportFileExtension,
   type ExportFormat,
@@ -18,6 +19,8 @@ export function useRecordingExport() {
       sourceBlob: Blob,
       format: ExportFormat,
       resolution: ExportResolution,
+      trim?: ClipExportTrim | null,
+      slices?: readonly ExportSlice[] | null,
     ): Promise<Blob | null> => {
       const generation = ++exportGenerationRef.current;
       setExporting(true);
@@ -25,11 +28,18 @@ export function useRecordingExport() {
       setExportProgress(0);
 
       try {
-        const result = await exportRecording(sourceBlob, format, resolution, ({ ratio }) => {
-          if (exportGenerationRef.current === generation) {
-            setExportProgress(ratio);
-          }
-        });
+        const result = await exportRecording(
+          sourceBlob,
+          format,
+          resolution,
+          ({ ratio }) => {
+            if (exportGenerationRef.current === generation) {
+              setExportProgress(ratio);
+            }
+          },
+          trim,
+          slices,
+        );
         if (exportGenerationRef.current !== generation) {
           return null;
         }

@@ -646,17 +646,11 @@ export function useDesktopRecorder(): DesktopRecorderApi {
     }
 
     return bridge.onRecorderCommand((command) => {
-      if (command === "start") {
-        startRecording();
-      }
       if (command === "stop") {
         stopRecording();
       }
-      if (command === "show-main") {
-        // Main process restores the window; no renderer action needed.
-      }
     });
-  }, [bridge, startRecording, stopRecording]);
+  }, [bridge, stopRecording]);
 
   useEffect(() => {
     if (!bridge || bridge.getAppInfo().platform !== "darwin") {

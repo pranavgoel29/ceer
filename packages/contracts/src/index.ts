@@ -19,6 +19,11 @@ export interface DesktopBridge {
   readonly resolveWindowCapture: (source: CaptureSourceRef) => Promise<WindowCapturePlan | null>;
   /** Opens a fullscreen overlay on the source display; null if cancelled. */
   readonly pickCaptureRegion: (sourceId: string) => Promise<CaptureRegionPickResult | null>;
+  /** Fullscreen 3-2-1 overlay on the primary display. */
+  readonly showDisplayCountdown: (remaining: number) => void;
+  readonly updateDisplayCountdown: (remaining: number) => void;
+  readonly hideDisplayCountdown: () => void;
+  readonly onDisplayCountdownCancelled: (listener: () => void) => () => void;
   /** Push recorder state to main (tray/HUD); call from the main window only. */
   readonly publishRecorderState: (state: RecorderRemoteState) => void;
   /** Commands forwarded from tray/HUD (start, stop, show-main, pick-area). */
@@ -160,6 +165,7 @@ declare global {
     desktopBridge?: DesktopBridge;
     areaPickerBridge?: AreaPickerBridge;
     controlWidgetBridge?: ControlWidgetBridge;
+    countdownOverlayBridge?: CountdownOverlayBridge;
   }
 }
 
@@ -182,6 +188,12 @@ export interface ControlWidgetBridge {
   readonly getRecorderState: () => RecorderRemoteState;
   readonly onRecorderState: (listener: (state: RecorderRemoteState) => void) => () => void;
   readonly sendRecorderCommand: (command: RecorderRemoteCommand) => void;
+}
+
+export interface CountdownOverlayBridge {
+  readonly getRemaining: () => number;
+  readonly onRemaining: (listener: (remaining: number) => void) => () => void;
+  readonly cancel: () => void;
 }
 
 export interface WindowCapturePlan {

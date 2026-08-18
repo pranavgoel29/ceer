@@ -7,6 +7,7 @@ import { App } from "./App.tsx";
 import { initTheme } from "./lib/theme.ts";
 import { AreaPickerPage } from "./components/recorder/area-picker-page.tsx";
 import { ControlWidgetPage } from "./components/recorder/control-widget-page.tsx";
+import { CountdownPage } from "./components/recorder/countdown-page.tsx";
 
 const root = document.getElementById("root");
 if (!root) {
@@ -23,6 +24,9 @@ if (mode === "area-picker") {
 } else if (mode === "control-widget") {
   document.documentElement.classList.add("control-widget-root");
   document.body.classList.add("control-widget-root");
+} else if (mode === "countdown") {
+  document.documentElement.classList.add("countdown-overlay-root");
+  document.body.classList.add("countdown-overlay-root");
 }
 
 createRoot(root).render(
@@ -31,6 +35,8 @@ createRoot(root).render(
       <AreaPickerPage />
     ) : mode === "control-widget" ? (
       <ControlWidgetPage />
+    ) : mode === "countdown" ? (
+      <CountdownPage />
     ) : (
       <App />
     )}

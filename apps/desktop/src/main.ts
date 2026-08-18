@@ -4,6 +4,7 @@ import path from "node:path";
 import type { CapturePreferences, CaptureSourceRef, PrivacyPane } from "@ceer/contracts";
 
 import { registerAreaPickerHandlers } from "./area-picker.ts";
+import { registerCountdownOverlay } from "./countdown-overlay.ts";
 import {
   getCapturePreferences,
   getSelectedCaptureSource,
@@ -144,6 +145,7 @@ function initializeApp(): void {
   wireDisplayMediaHandler();
   registerIpcHandlers();
   registerAreaPickerHandlers(() => mainWindow);
+  registerCountdownOverlay(() => mainWindow);
   registerRecordingControl({
     getMainWindow: () => mainWindow,
     setCaptureSource: (source) => {
