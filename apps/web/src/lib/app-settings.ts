@@ -1,3 +1,10 @@
+import {
+  isCaptureFrameRate,
+  isCaptureResolution,
+  type CaptureFrameRate,
+  type CaptureResolution,
+} from "~/lib/video-quality";
+
 const SETTINGS_STORAGE_KEY = "ceer-settings:v1";
 const SETTINGS_CHANGE = "ceer-settings-change";
 
@@ -6,6 +13,8 @@ export interface AppSettings {
   readonly micEnabled: boolean;
   readonly systemAudioEnabled: boolean;
   readonly hideMainWhileRecording: boolean;
+  readonly captureResolution: CaptureResolution;
+  readonly captureFrameRate: CaptureFrameRate;
 }
 
 export const DESKTOP_SETTING_DEFAULTS: AppSettings = {
@@ -13,6 +22,8 @@ export const DESKTOP_SETTING_DEFAULTS: AppSettings = {
   micEnabled: true,
   systemAudioEnabled: true,
   hideMainWhileRecording: true,
+  captureResolution: "native",
+  captureFrameRate: 60,
 };
 
 export const WEB_SETTING_DEFAULTS: AppSettings = {
@@ -20,6 +31,8 @@ export const WEB_SETTING_DEFAULTS: AppSettings = {
   micEnabled: false,
   systemAudioEnabled: true,
   hideMainWhileRecording: true,
+  captureResolution: "native",
+  captureFrameRate: 60,
 };
 
 export function desktopSettingDefaults(): AppSettings {
@@ -52,6 +65,12 @@ function parseStoredSettings(raw: string, fallback: AppSettings): AppSettings {
     hideMainWhileRecording: isBoolean(record.hideMainWhileRecording)
       ? record.hideMainWhileRecording
       : fallback.hideMainWhileRecording,
+    captureResolution: isCaptureResolution(record.captureResolution)
+      ? record.captureResolution
+      : fallback.captureResolution,
+    captureFrameRate: isCaptureFrameRate(record.captureFrameRate)
+      ? record.captureFrameRate
+      : fallback.captureFrameRate,
   };
 }
 

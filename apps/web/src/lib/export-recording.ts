@@ -21,11 +21,13 @@ import {
   type ExportFormat,
   type ExportResolution,
 } from "~/lib/recording-options";
+import { evenDimension, recorderBitrateForSettings } from "~/lib/video-quality";
 
 const RESOLUTION_HEIGHT: Record<Exclude<ExportResolution, "source">, number> = {
   "720p": 720,
   "1080p": 1080,
   "1440p": 1440,
+  "2160p": 2160,
 };
 
 let aacEncoderRegistered = false;
@@ -63,13 +65,31 @@ function createOutput(format: ExportFormat) {
   });
 }
 
-function videoOptions(resolution: ExportResolution) {
-  if (resolution === "source") {
+function exportVideoBitrate(resolution: ExportResolution): number {
+  const height = resolution === "source" ? 1080 : RESOLUTION_HEIGHT[resolution];
+  const width = evenDimension(height * (16 / 9));
+  return recorderBitrateForSettings(width, height, 60).videoBitsPerSecond;
+}
+
+function videoOptions(format: ExportFormat, resolution: ExportResolution) {
+  const resize =
+    resolution === "source"
+      ? {}
+      : {
+          height: RESOLUTION_HEIGHT[resolution],
+          fit: "contain" as const,
+        };
+  const transcode = format !== "webm" || resolution !== "source";
+  if (!transcode && resolution === "source") {
     return undefined;
   }
   return {
-    height: RESOLUTION_HEIGHT[resolution],
-    fit: "contain" as const,
+    ...resize,
+    ...(transcode
+      ? {
+          bitrate: exportVideoBitrate(resolution),
+        }
+      : {}),
   };
 }
 
@@ -87,7 +107,7 @@ async function convertRange(
     formats: ALL_FORMATS,
   });
   const output = createOutput(format);
-  const video = videoOptions(resolution);
+  const video = videoOptions(format, resolution);
   const includeAudio = slice?.includeAudio !== false;
 
   const conversion = await Conversion.init({

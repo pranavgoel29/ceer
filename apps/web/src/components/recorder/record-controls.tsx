@@ -1,4 +1,6 @@
 import {
+  FilmStripIcon,
+  FrameCornersIcon,
   MicrophoneIcon,
   RecordIcon,
   SpeakerHighIcon,
@@ -11,10 +13,24 @@ import { Button } from "~/components/ui/button";
 import { RecorderPanel } from "~/components/recorder/recorder-panel";
 import { Separator } from "~/components/ui/separator";
 import { Switch } from "~/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
+import { useAppSettings } from "~/hooks/use-app-settings";
 import { DESKTOP_SYSTEM_AUDIO_HINT, WEB_SYSTEM_AUDIO_HINT } from "~/lib/capture-platform";
 import { useRecorderPlatformContext } from "~/components/recorder/recorder-platform-context";
 import { cn } from "~/lib/utils";
+import {
+  CAPTURE_FRAME_RATES,
+  CAPTURE_RESOLUTIONS,
+  isCaptureFrameRate,
+  isCaptureResolution,
+} from "~/lib/video-quality";
 
 interface RecordControlsProps {
   readonly phase: RecorderPhase;
@@ -101,7 +117,9 @@ export function RecordControls(props: RecordControlsProps) {
   const isActiveCapture = isRecording || isStopping;
   const isStopped = phase === "stopped" && recording !== null;
   const togglesDisabled = togglesDisabledProp || isActiveCapture;
-  const { isWeb } = useRecorderPlatformContext();
+  const { isWeb, isDesktop } = useRecorderPlatformContext();
+  const { settings, patch } = useAppSettings(isDesktop);
+  const pictureLocked = isActiveCapture;
 
   return (
     <RecorderPanel
@@ -116,6 +134,71 @@ export function RecordControls(props: RecordControlsProps) {
       tilt="right"
       contentClassName="gap-5"
     >
+      <PanelSection title="Picture">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <FrameCornersIcon className="size-3.5" />
+              Resolution
+            </span>
+            <Select
+              value={settings.captureResolution}
+              disabled={pictureLocked}
+              onValueChange={(value) => {
+                if (isCaptureResolution(value)) {
+                  patch({ captureResolution: value });
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Capture resolution" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTURE_RESOLUTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <FilmStripIcon className="size-3.5" />
+              Frame rate
+            </span>
+            <Select
+              value={String(settings.captureFrameRate)}
+              disabled={pictureLocked}
+              onValueChange={(value) => {
+                const next = Number(value);
+                if (isCaptureFrameRate(next)) {
+                  patch({ captureFrameRate: next });
+                }
+              }}
+            >
+              <SelectTrigger aria-label="Capture frame rate" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTURE_FRAME_RATES.map((item) => (
+                  <SelectItem key={item.value} value={String(item.value)}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {phase === "armed"
+            ? "Applies on the next source pick or share so the encoder can lock a clean size."
+            : "Native + 60 fps keeps motion sharp. Lower the cap if the file size gets large."}
+        </p>
+      </PanelSection>
+
+      <Separator className="opacity-60" />
+
       <PanelSection title="Audio mix">
         <div className="flex flex-col gap-2">
           <AudioToggleRow

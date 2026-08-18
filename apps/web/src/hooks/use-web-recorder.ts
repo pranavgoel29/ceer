@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { WebRecorderApi } from "~/hooks/recorder-api";
 import type { RecorderPhase, RecordingResult } from "~/hooks/recorder-types";
 import { readAppSettings, webSettingDefaults } from "~/lib/app-settings";
+import { createScaledStream } from "~/lib/crop-video-stream";
 import {
   captureSourceRefFromDisplayStream,
   isFirefox,
@@ -20,6 +21,11 @@ import {
   stopRecorder,
   stopStreamTracks,
 } from "~/lib/recorder-media";
+import {
+  captureMaxHeight,
+  prepareCaptureVideoTrack,
+  trackExceedsResolution,
+} from "~/lib/video-quality";
 import {
   finalizeChunks,
   prepareRecordStream,
@@ -48,6 +54,8 @@ export function useWebRecorder(): WebRecorderApi {
   const systemAudioEnabledRef = useRef(systemAudioEnabled);
   const shareGenerationRef = useRef(0);
   const displayStreamRef = useRef<MediaStream | null>(null);
+  const captureSourceRef = useRef<MediaStream | null>(null);
+  const outputCleanupRef = useRef<(() => void) | null>(null);
   const micTrackRef = useRef<MediaStreamTrack | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const recordStreamRef = useRef<MediaStream | null>(null);
@@ -157,8 +165,16 @@ export function useWebRecorder(): WebRecorderApi {
     clearStopFallback();
     clearTimer();
     releaseMic();
-    stopStreamTracks(displayStreamRef.current);
+    outputCleanupRef.current?.();
+    outputCleanupRef.current = null;
+    const output = displayStreamRef.current;
+    const source = captureSourceRef.current;
+    stopStreamTracks(output);
+    if (source && source !== output) {
+      stopStreamTracks(source);
+    }
     displayStreamRef.current = null;
+    captureSourceRef.current = null;
     setPreviewStream(null);
   }, [clearPreparedRecord, clearStopFallback, clearTimer, releaseMic]);
 
@@ -199,20 +215,55 @@ export function useWebRecorder(): WebRecorderApi {
     const shareGeneration = ++shareGenerationRef.current;
     setError(null);
     releaseMic();
-    stopStreamTracks(displayStreamRef.current);
+    outputCleanupRef.current?.();
+    outputCleanupRef.current = null;
+    const previousOutput = displayStreamRef.current;
+    const previousSource = captureSourceRef.current;
+    stopStreamTracks(previousOutput);
+    if (previousSource && previousSource !== previousOutput) {
+      stopStreamTracks(previousSource);
+    }
     displayStreamRef.current = null;
+    captureSourceRef.current = null;
     setPreviewStream(null);
     setPreviewLoading(true);
     setPhase("idle");
 
     try {
-      const displayStream = await acquireDisplayStream(systemAudioEnabledRef.current);
+      const quality = readAppSettings(webSettingDefaults());
+      const captureStream = await acquireDisplayStream(
+        systemAudioEnabledRef.current,
+        quality.captureResolution,
+        quality.captureFrameRate,
+      );
+      const videoTrack = captureStream.getVideoTracks()[0];
+      if (videoTrack) {
+        await prepareCaptureVideoTrack(
+          videoTrack,
+          quality.captureResolution,
+          quality.captureFrameRate,
+        );
+      }
+
+      let displayStream = captureStream;
+      const maxHeight = captureMaxHeight(quality.captureResolution);
+      if (videoTrack && maxHeight && trackExceedsResolution(videoTrack, quality.captureResolution)) {
+        const scaled = await createScaledStream(captureStream, maxHeight);
+        outputCleanupRef.current = scaled.cleanup;
+        displayStream = scaled.stream;
+      }
 
       if (!isActiveShare(shareGeneration)) {
+        outputCleanupRef.current?.();
+        outputCleanupRef.current = null;
         stopStreamTracks(displayStream);
+        if (captureStream !== displayStream) {
+          stopStreamTracks(captureStream);
+        }
         return;
       }
 
+      captureSourceRef.current = captureStream;
       displayStreamRef.current = displayStream;
       setPreviewStream(displayStream);
       setDisplayCaptureAudioEnabled(displayStream, systemAudioEnabledRef.current);
@@ -225,7 +276,7 @@ export function useWebRecorder(): WebRecorderApi {
         }),
       );
 
-      const source = captureSourceRefFromDisplayStream(displayStream);
+      const source = captureSourceRefFromDisplayStream(captureStream);
       setWebShareLabel(source.name);
 
       if (micEnabledRef.current) {
@@ -258,19 +309,28 @@ export function useWebRecorder(): WebRecorderApi {
 
       if (!isActiveShare(shareGeneration)) {
         stopStreamTracks(displayStream);
+        if (captureSourceRef.current && captureSourceRef.current !== displayStream) {
+          stopStreamTracks(captureSourceRef.current);
+        }
         return;
       }
 
       setPreviewLoading(false);
       setPhase("armed");
-      attachShareEnded(displayStream, shareGeneration);
+      attachShareEnded(captureStream, shareGeneration);
       await warmRecordStream();
     } catch (cause) {
       if (!isActiveShare(shareGeneration)) {
         return;
       }
       stopStreamTracks(displayStreamRef.current);
+      if (captureSourceRef.current && captureSourceRef.current !== displayStreamRef.current) {
+        stopStreamTracks(captureSourceRef.current);
+      }
+      outputCleanupRef.current?.();
+      outputCleanupRef.current = null;
       displayStreamRef.current = null;
+      captureSourceRef.current = null;
       setWebShareLabel(null);
       setPreviewStream(null);
       setPreviewLoading(false);

@@ -1,4 +1,10 @@
 import { isFirefox } from "~/lib/capture-platform";
+import {
+  recorderBitrateForTrack,
+  videoConstraintsForQuality,
+  type CaptureFrameRate,
+  type CaptureResolution,
+} from "~/lib/video-quality";
 
 const RECORDER_MIME_WITH_AUDIO = [
   "video/webm;codecs=vp9,opus",
@@ -21,9 +27,15 @@ const RECORDER_MIME_VIDEO_ONLY = [
 export const RECORD_TIMESLICE_MS = 1000;
 
 /** Request tab/window/screen audio when the browser supports it (Chrome systemAudio, etc.). */
-export function buildDisplayMediaOptions(wantsAudio: boolean): DisplayMediaStreamOptions {
+export function buildDisplayMediaOptions(
+  wantsAudio: boolean,
+  resolution: CaptureResolution = "native",
+  frameRate: CaptureFrameRate = 60,
+): DisplayMediaStreamOptions {
+  const video = videoConstraintsForQuality(resolution, frameRate);
+
   if (!wantsAudio) {
-    return { video: true, audio: false };
+    return { video, audio: false };
   }
 
   const audio = {
@@ -34,39 +46,55 @@ export function buildDisplayMediaOptions(wantsAudio: boolean): DisplayMediaStrea
     systemAudio: "include",
   } as MediaTrackConstraints;
 
-  return { video: true, audio };
+  return { video, audio };
 }
 
-function buildFirefoxDisplayMediaOptions(wantsAudio: boolean): DisplayMediaStreamOptions {
+function buildFirefoxDisplayMediaOptions(
+  wantsAudio: boolean,
+  resolution: CaptureResolution,
+  frameRate: CaptureFrameRate,
+): DisplayMediaStreamOptions {
   return {
-    video: true,
+    video: videoConstraintsForQuality(resolution, frameRate),
     audio: wantsAudio,
     preferCurrentTab: true,
     selfBrowserSurface: "include",
   } as DisplayMediaStreamOptions;
 }
 
-export async function acquireDisplayStream(wantsAudio: boolean): Promise<MediaStream> {
+export async function acquireDisplayStream(
+  wantsAudio: boolean,
+  resolution: CaptureResolution = "native",
+  frameRate: CaptureFrameRate = 60,
+): Promise<MediaStream> {
   if (isFirefox()) {
-    const options = buildFirefoxDisplayMediaOptions(wantsAudio);
+    const options = buildFirefoxDisplayMediaOptions(wantsAudio, resolution, frameRate);
     try {
       return await navigator.mediaDevices.getDisplayMedia(options);
     } catch {
       return navigator.mediaDevices.getDisplayMedia({
-        video: true,
+        video: videoConstraintsForQuality(resolution, frameRate),
         audio: wantsAudio,
       });
     }
   }
 
   if (!wantsAudio) {
-    return navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    return navigator.mediaDevices.getDisplayMedia({
+      video: videoConstraintsForQuality(resolution, frameRate),
+      audio: false,
+    });
   }
 
   try {
-    return await navigator.mediaDevices.getDisplayMedia(buildDisplayMediaOptions(true));
+    return await navigator.mediaDevices.getDisplayMedia(
+      buildDisplayMediaOptions(true, resolution, frameRate),
+    );
   } catch {
-    return navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    return navigator.mediaDevices.getDisplayMedia({
+      video: videoConstraintsForQuality(resolution, frameRate),
+      audio: true,
+    });
   }
 }
 
@@ -219,11 +247,26 @@ export function createRecorder(
       continue;
     }
     try {
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const rates = recorderBitrateForTrack(stream.getVideoTracks()[0]);
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: rates.videoBitsPerSecond,
+        audioBitsPerSecond: rates.audioBitsPerSecond,
+      });
       attachRecorderHandlers(recorder, handlers);
       return { recorder, mimeType };
     } catch {
-      // Try next codec.
+      try {
+        const rates = recorderBitrateForTrack(stream.getVideoTracks()[0]);
+        const recorder = new MediaRecorder(stream, {
+          mimeType,
+          videoBitsPerSecond: Math.round(rates.videoBitsPerSecond / 2),
+        });
+        attachRecorderHandlers(recorder, handlers);
+        return { recorder, mimeType };
+      } catch {
+        // Try next codec without an explicit bitrate.
+      }
     }
   }
 
